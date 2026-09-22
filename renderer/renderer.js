@@ -37,7 +37,16 @@
     const title = active ? 'End session' : 'Start session';
     btn.title = title;
     btn.setAttribute('aria-label', title);
-    refreshEmptyState(!!active);
+    const listening = !!active;
+    const row = document.getElementById('action-row');
+    if (row) row.classList.toggle('hidden', !listening);
+    const ph = document.getElementById('placeholder');
+    if (ph) {
+      ph.textContent = listening
+        ? 'Ask about your conversation or something on your screen'
+        : 'Ask a question that Cue has access to.';
+    }
+    refreshEmptyState(listening);
   }
   setSessionButton(false);
 
