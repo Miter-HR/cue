@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('cue', {
   systemPcm: (arrayBuffer) => ipcRenderer.send('system:pcm', arrayBuffer),
   setIgnoreMouse: (v) => ipcRenderer.send('mouse:ignore', v),
   clearTranscript: () => ipcRenderer.invoke('transcript:clear'),
+  simulateTranscript: (channel, text) => ipcRenderer.invoke('transcript:simulate', { channel, text }),
   openPane: (url) => ipcRenderer.send('open-pane', url),
   publikState: () => ipcRenderer.invoke('publik:state'),
   publikAcceptDisclosure: () => ipcRenderer.invoke('publik:accept-disclosure'),

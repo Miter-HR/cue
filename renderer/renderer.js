@@ -885,6 +885,8 @@
   }
 
   let sttState = 'disconnected';
+  let simulating = false;        // Simulating-conversation testing mode (see below)
+  let underlyingSttState = null;
 
   const STT_LABELS = {
     disconnected: 'Transcription off',
@@ -894,16 +896,90 @@
     batch: 'Transcription running',
     local: 'Transcription running',
     stopping: 'Stopping transcription…',
-    error: 'Transcription error'
+    error: 'Transcription error',
+    simulating: 'Simulating conversation'
   };
 
   function setSttState(state) {
+    // While simulating, real transcription updates keep flowing underneath but
+    // the label stays on "Simulating conversation" until the session ends.
+    if (simulating && state !== 'simulating' && state !== 'disconnected') { underlyingSttState = state; return; }
     sttState = state;
     const label = document.getElementById('stt-status');
     if (!label) return;
     label.textContent = STT_LABELS[state];
     label.className = 'stt-status stt-' + state;
   }
+
+  // ---- Simulating conversation (testing aid) --------------------------------
+  // With a session running, press T to switch the status to "Simulating
+  // conversation". Then T opens a line as Them, Y opens a line as You; Enter
+  // sends it through the same path a real transcription takes. Esc closes the
+  // line, Esc again leaves simulation. Ending the session leaves it too.
+  let simChannel = 'them';
+  const simBar = $('#sim-bar');
+  const simInput = $('#sim-input');
+  const simWho = $('#sim-who');
+
+  function enterSimulation() {
+    if (simulating) return;
+    simulating = true;
+    underlyingSttState = sttState;
+    setSttState('simulating');
+    showToast('Simulating conversation — T: them · Y: you · Esc: leave', 2600);
+  }
+  function leaveSimulation() {
+    if (!simulating) return;
+    closeSimLine();
+    simulating = false;
+    const restore = underlyingSttState && underlyingSttState !== 'simulating' ? underlyingSttState : 'disconnected';
+    underlyingSttState = null;
+    setSttState(restore);
+  }
+  function openSimLine(channel) {
+    simChannel = channel;
+    simWho.textContent = channel === 'you' ? 'You' : 'Them';
+    simWho.className = 'sim-who ' + channel;
+    simInput.placeholder = channel === 'you' ? 'Type what you say · Enter adds it · Esc closes' : 'Type what they say · Enter adds it · Esc closes';
+    simBar.classList.remove('hidden');
+    simInput.focus();
+  }
+  function closeSimLine() {
+    simBar.classList.add('hidden');
+    simInput.value = '';
+    simInput.blur();
+  }
+  async function submitSimLine() {
+    const text = simInput.value.trim();
+    if (!text) { closeSimLine(); return; }
+    const res = await cue.simulateTranscript(simChannel, text);
+    if (!res || !res.ok) showToast('Could not add line' + (res && res.reason ? ': ' + res.reason : ''), 1800);
+    closeSimLine();
+  }
+  simInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submitSimLine(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeSimLine(); }
+    e.stopPropagation();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (typing) return;
+    const sessionActive = $('#stop-btn').classList.contains('active');
+    const key = e.key.toLowerCase();
+    if (key === 't') {
+      if (!sessionActive) return;
+      e.preventDefault();
+      if (!simulating) enterSimulation(); else openSimLine('them');
+    } else if (key === 'y' && simulating) {
+      e.preventDefault();
+      openSimLine('you');
+    } else if (e.key === 'Escape' && simulating && simBar.classList.contains('hidden')) {
+      e.preventDefault();
+      leaveSimulation();
+    }
+  });
 
   function updateSttStatus({ active, streaming } = {}) {
     if (active === false) setSttState('disconnected');
@@ -1071,6 +1147,7 @@
 
   // ---- events from main --------------------------------------------------
   cue.on('capture:state', ({ active, streaming, mode }) => {
+    if (!active) leaveSimulation();
     setLiveDotState(active ? 'idle' : 'off');
     setSessionButton(active);
     // FIX #4: Add .listening class to composer when capture is active

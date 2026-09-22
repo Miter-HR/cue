@@ -886,6 +886,17 @@ ipcMain.handle('transcript:clear', () => {
   transcript.splice(0, transcript.length);
   return { ok: true };
 });
+// Testing aid: the renderer's "Simulating conversation" mode types a line as
+// Them or You. It goes through publishTranscript, so it reaches the transcript
+// buffer, the sidebar and the composer exactly like a real transcription would.
+ipcMain.handle('transcript:simulate', (_e, payload) => {
+  const channel = payload && payload.channel === 'you' ? 'you' : 'them';
+  const text = payload && typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
+  if (!state.capturing) return { ok: false, reason: 'no active session' };
+  if (!text) return { ok: false, reason: 'empty' };
+  publishTranscript(channel, text);
+  return { ok: true };
+});
 ipcMain.on('ask', (_e, payload) => runFeature(payload.mode, payload.text));
 ipcMain.on('mic:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('you', arrayBuffer); });
 ipcMain.on('system:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('them', arrayBuffer); });

@@ -979,3 +979,28 @@ button:focus { outline: none; }
 .cs-title { font-size: 15px; font-weight: 620; color: var(--tx-1); line-height: 1.35; }
 .cs-body { margin-top: 10px; color: var(--tx-mut); font-size: 12.5px; line-height: 1.5; white-space: pre-line; }
 .cs-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+
+/* ---- Simulating conversation (testing aid; press T during a session) ---- */
+.stt-simulating   { color: #f0abfc; }
+#sim-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; margin-bottom: -6px;
+  padding: 8px 10px;
+  background: rgba(240,171,252,0.08);
+  border: 1px solid rgba(240,171,252,0.35);
+  border-radius: var(--r-16);
+}
+#sim-bar.hidden { display: none; }
+.sim-who {
+  flex: none; min-width: 42px; text-align: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 999px;
+}
+.sim-who.them { background: rgba(160,210,255,0.18); color: rgba(160,210,255,0.95); }
+.sim-who.you  { background: rgba(180,255,200,0.16); color: rgba(180,255,200,0.95); }
+#sim-input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  color: rgba(255,255,255,0.92); font: inherit; font-size: 13px;
+}
+#sim-input::placeholder { color: rgba(255,255,255,0.35); }
+.sim-hint { flex: none; font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; }
