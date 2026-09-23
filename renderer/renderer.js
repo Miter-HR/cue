@@ -1395,9 +1395,19 @@
 
   function updateCustomProviderFields() {
     const provider = settings.provider;
+    const sttProvider = settings.sttProvider || 'auto';
+    const showOpenAiForStt = sttProvider === 'openai';
     document.querySelectorAll('[data-key-for]').forEach((el) => {
-      el.classList.toggle('hidden', el.dataset.keyFor !== provider);
+      const keyFor = el.dataset.keyFor;
+      const visible = keyFor === provider || (keyFor === 'openai' && showOpenAiForStt);
+      el.classList.toggle('hidden', !visible);
     });
+    const openaiLabel = document.querySelector('[data-key-for="openai"] span');
+    if (openaiLabel) {
+      openaiLabel.textContent = (showOpenAiForStt && provider !== 'openai')
+        ? 'OpenAI (speech-to-text)'
+        : 'OpenAI';
+    }
     $('#custom-endpoint-settings').classList.toggle('hidden', provider !== 'custom');
     $('#publik-settings').classList.toggle('hidden', provider !== 'publik');
     renderPublikBlock();
@@ -1601,6 +1611,7 @@
     document.querySelectorAll('#stt-provider-seg button').forEach((candidate) => {
       candidate.classList.toggle('on', candidate === button);
     });
+    updateCustomProviderFields();
     $('#s-status').textContent = statusText();
   }));
 
@@ -1764,7 +1775,13 @@
     // saved for the provider the user actually meant to use.
     if (!settings.apiKeys[settings.provider]) {
       const keyedProviders = ['cerebras', 'openai', 'anthropic', 'groq'];
-      const justFilled = keyedProviders.find((p) => settings.apiKeys[p]);
+      const justFilled = keyedProviders.find((p) => {
+        if (!settings.apiKeys[p]) return false;
+        // An OpenAI key shown only because STT is OpenAI is not a signal to
+        // switch the chat provider.
+        if (p === 'openai' && settings.sttProvider === 'openai' && settings.provider !== 'openai') return false;
+        return true;
+      });
       if (justFilled) settings.provider = justFilled;
     }
     // Transcription
