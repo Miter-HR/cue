@@ -187,7 +187,11 @@
           <button data-stt-provider="openai">OpenAI</button>
           <button data-stt-provider="custom">Custom</button>
         </div>
-        <div class="s-note">Local mode keeps microphone and meeting audio on this computer. It never silently falls back to a cloud transcription provider. OpenAI uses the OpenAI key on the API Keys tab. Custom sends audio to the Base URL and Custom key set on the API Keys tab (requires both).</div>
+        <div class="s-note">Local mode keeps microphone and meeting audio on this computer. It never silently falls back to a cloud transcription provider. If OpenAI is also your chat provider, the key lives on the API Keys tab. Custom sends audio to the Base URL and Custom key set on the API Keys tab (requires both).</div>
+        <div id="openai-stt-key-field" class="hidden">
+          <label class="s-label">OpenAI API key <span class="s-hint">used for speech-to-text · stored locally</span></label>
+          <div class="s-field"><span>OpenAI</span><input id="key-openai-stt" type="password" placeholder="sk-..." autocomplete="off" /></div>
+        </div>
 
         <label class="s-label">Meeting audio <span class="s-hint">transcribe the other side of a call</span></label>
         <div class="s-seg" id="meeting-audio-seg">

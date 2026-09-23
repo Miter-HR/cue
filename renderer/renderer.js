@@ -1393,21 +1393,26 @@
     });
   });
 
+  function visibleOpenAiKeyValue() {
+    const audioField = $('#openai-stt-key-field');
+    const audioVisible = audioField && !audioField.classList.contains('hidden');
+    if (audioVisible) return $('#key-openai-stt').value;
+    return $('#key-openai').value;
+  }
+
   function updateCustomProviderFields() {
     const provider = settings.provider;
     const sttProvider = settings.sttProvider || 'auto';
-    const showOpenAiForStt = sttProvider === 'openai';
+    const openaiOnAudio = sttProvider === 'openai' && provider !== 'openai';
+    const currentKey = visibleOpenAiKeyValue();
+    $('#key-openai').value = currentKey;
+    if ($('#key-openai-stt')) $('#key-openai-stt').value = currentKey;
     document.querySelectorAll('[data-key-for]').forEach((el) => {
-      const keyFor = el.dataset.keyFor;
-      const visible = keyFor === provider || (keyFor === 'openai' && showOpenAiForStt);
-      el.classList.toggle('hidden', !visible);
+      el.classList.toggle('hidden', el.dataset.keyFor !== provider);
     });
     const openaiLabel = document.querySelector('[data-key-for="openai"] span');
-    if (openaiLabel) {
-      openaiLabel.textContent = (showOpenAiForStt && provider !== 'openai')
-        ? 'OpenAI (speech-to-text)'
-        : 'OpenAI';
-    }
+    if (openaiLabel) openaiLabel.textContent = 'OpenAI';
+    $('#openai-stt-key-field')?.classList.toggle('hidden', !openaiOnAudio);
     $('#custom-endpoint-settings').classList.toggle('hidden', provider !== 'custom');
     $('#publik-settings').classList.toggle('hidden', provider !== 'publik');
     renderPublikBlock();
@@ -1507,6 +1512,7 @@
     document.querySelectorAll('#provider-seg button').forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
     $('#key-cerebras').value = settings.apiKeys.cerebras || '';
     $('#key-openai').value = settings.apiKeys.openai || '';
+    if ($('#key-openai-stt')) $('#key-openai-stt').value = settings.apiKeys.openai || '';
     $('#key-anthropic').value = settings.apiKeys.anthropic || '';
     $('#key-groq').value = settings.apiKeys.groq || '';
     $('#key-custom').value = settings.apiKeys.custom || '';
@@ -1758,7 +1764,7 @@
   async function saveSettings() {
     // Keys
     settings.apiKeys.cerebras = $('#key-cerebras').value.trim();
-    settings.apiKeys.openai = $('#key-openai').value.trim();
+    settings.apiKeys.openai = visibleOpenAiKeyValue().trim();
     settings.apiKeys.anthropic = $('#key-anthropic').value.trim();
     settings.apiKeys.groq = $('#key-groq').value.trim();
     settings.apiKeys.custom = $('#key-custom').value.trim();
