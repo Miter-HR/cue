@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { looksLikeHallucination, buildVocabPrompt } = require('../src/stt');
-const { DeepgramStreamingSTT } = require('../src/stt-streaming');
+const { DeepgramStreamingSTT, OpenAIRealtimeSTT, applyTranscriptDelta } = require('../src/stt-streaming');
 
 test('looksLikeHallucination drops Whisper silence artifacts', () => {
   ['', '   ', 'Thank you for watching.', 'thanks for watching', 'Bye-bye!', '👍👍'].forEach((s) => {
@@ -48,4 +48,53 @@ test('Deepgram drops hallucinated finals', () => {
   const d = new DeepgramStreamingSTT('k', { onTranscript: (t) => finals.push(t) });
   d._handleMessage({ type: 'Results', is_final: true, speech_final: true, channel: { alternatives: [{ transcript: 'Thank you.' }] } });
   assert.deepEqual(finals, []);
+});
+
+test('applyTranscriptDelta concatenates incremental tokens and prefers snapshots', () => {
+  assert.equal(applyTranscriptDelta('', 'Tell'), 'Tell');
+  assert.equal(applyTranscriptDelta('Tell', ' me'), 'Tell me');
+  assert.equal(applyTranscriptDelta('Hello', 'Hello there'), 'Hello there');
+  assert.equal(applyTranscriptDelta('Hello there', 'Hello'), 'Hello there');
+});
+
+test('OpenAI realtime accumulates incremental deltas into one interim, then one final', () => {
+  const interims = [];
+  const finals = [];
+  const s = new OpenAIRealtimeSTT('k', {
+    onInterim: (t) => interims.push(t),
+    onTranscript: (t) => finals.push(t)
+  });
+  s._handleEvent({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'i1', delta: 'Tell' });
+  s._handleEvent({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'i1', delta: ' me' });
+  s._handleEvent({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'i1', delta: ' about' });
+  s._handleEvent({
+    type: 'conversation.item.input_audio_transcription.completed',
+    item_id: 'i1',
+    transcript: 'Tell me about Kubernetes.'
+  });
+  assert.deepEqual(interims, ['Tell', 'Tell me', 'Tell me about', '']);
+  assert.deepEqual(finals, ['Tell me about Kubernetes.']);
+});
+
+test('OpenAI realtime completed falls back to accumulated deltas when transcript is missing', () => {
+  const finals = [];
+  const s = new OpenAIRealtimeSTT('k', { onTranscript: (t) => finals.push(t) });
+  s._handleEvent({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'i1', delta: 'hello there' });
+  s._handleEvent({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'i1' });
+  assert.deepEqual(finals, ['hello there']);
+});
+
+test('OpenAI commit sends input_audio_buffer.commit only after uncommitted audio', () => {
+  const sent = [];
+  const s = new OpenAIRealtimeSTT('k');
+  s.connected = true;
+  s._sessionReady = true;
+  s.ws = { readyState: 1, send: (raw) => sent.push(JSON.parse(raw)) };
+  s.commit();
+  assert.deepEqual(sent, []);
+  s._uncommitted = true;
+  s.commit();
+  assert.deepEqual(sent, [{ type: 'input_audio_buffer.commit' }]);
+  s.commit();
+  assert.equal(sent.length, 1);
 });
