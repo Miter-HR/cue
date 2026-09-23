@@ -186,8 +186,8 @@ html, body {
 #panel-wrap { position: relative; margin-top: 12px; width: 624px; }
 button:focus { outline: none; }
 #live-dot {
-  position: absolute; top: -3px; left: -5px; z-index: 4;
-  width: 10px; height: 10px; border-radius: 50%;
+  flex: none;
+  width: 7px; height: 7px; border-radius: 50%;
   background: var(--live);
   box-shadow: 0 0 0 3px rgba(34,197,94,0.25), 0 0 8px rgba(34,197,94,0.6);
   animation: pulse 2s infinite;
@@ -923,9 +923,9 @@ button:focus { outline: none; }
 }
 
 /* ============================ STT status ============================ */
+.panel-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 #stt-status {
-  position: absolute; top: 14px; left: 14px; z-index: 4;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; text-transform: uppercase;
   white-space: nowrap; pointer-events: none;
 }
 .stt-disconnected { color: rgba(255,255,255,0.25); }
