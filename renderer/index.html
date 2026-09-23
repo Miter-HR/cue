@@ -16,6 +16,17 @@
       </div>
       <button class="tb-logo" id="logo-btn" title="How to use cue" aria-label="How to use cue"></button>
       <button class="tb-settings" id="tb-settings-btn" title="Settings" aria-label="Settings"></button>
+      <div class="tb-opacity-wrap">
+        <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
+          <span class="ic"></span>
+        </button>
+        <div id="opacity-popover" class="opacity-popover hidden">
+          <div class="opacity-row">
+            <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" aria-label="Opacity" />
+            <span id="tb-opacity-value">100%</span>
+          </div>
+        </div>
+      </div>
       <div class="tb-divider"></div>
       <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
       <div class="tb-divider"></div>
@@ -31,27 +42,16 @@
         </div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-opacity-wrap">
-        <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
-          <span class="ic"></span>
-        </button>
-        <div id="opacity-popover" class="opacity-popover hidden">
-          <div class="opacity-label">Opacity</div>
-          <div class="opacity-row">
-            <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" />
-            <span id="tb-opacity-value">100%</span>
-          </div>
-        </div>
-      </div>
-      <div class="tb-divider"></div>
       <button class="tb-quit" id="quit-btn" title="Quit cue" aria-label="Quit cue"></button>
     </div>
 
     <!-- Main assistant panel -->
     <div id="panel-wrap">
-      <span id="live-dot" class="off"></span>
-      <div id="stt-status" class="stt-status stt-disconnected">Transcription off</div>
       <div id="panel" class="glass no-drag">
+        <div class="panel-status">
+          <span id="live-dot" class="off"></span>
+          <span id="stt-status" class="stt-status stt-disconnected">Transcription off</span>
+        </div>
 
         <!-- Two-column layout: responses (left) + live transcript sidebar (right) -->
         <div id="panel-columns">
@@ -93,9 +93,9 @@
               </div>
             </div>
             <div id="composer-extras">
-              <button id="history-btn" class="history-btn" title="Show conversation history" aria-label="Show conversation history">
+              <button id="history-btn" class="history-btn" title="Show transcript" aria-label="Show transcript">
                 <span class="ic"></span>
-                <span class="history-label">Show conversation history</span>
+                <span class="history-label">Show transcript</span>
               </button>
             </div>
           </div>
@@ -106,14 +106,14 @@
       <!-- Transcript history sidebar — slides out from behind the panel's right edge -->
       <div id="transcript-sidebar" class="transcript-sidebar">
         <div class="ts-header">
-          <span class="ts-title">Transcription history</span>
-          <button class="ts-close-btn" id="close-sidebar-btn" title="Close history">✕</button>
+          <span class="ts-title">Transcript</span>
+          <button class="ts-close-btn" id="close-sidebar-btn" title="Close transcript">✕</button>
         </div>
         <div id="ts-list" class="ts-list">
-          <div class="ts-placeholder">Conversation history will appear here when listening.</div>
+          <div class="ts-placeholder">Start a session to see the transcript here.</div>
         </div>
         <div class="ts-footer">
-          <button class="ts-clear-btn" id="clear-transcript-btn" title="Clear all history">Clear History</button>
+          <button class="ts-clear-btn" id="clear-transcript-btn" title="Clear the whole transcript">Clear transcript</button>
         </div>
       </div>
     </div>
