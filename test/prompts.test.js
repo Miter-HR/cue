@@ -18,6 +18,13 @@ test('say mode produces a spoken answer not a question', () => {
   assert.match(text, /actual words|Write the|2.5 sentences/i);
 });
 
+test('assist and say refuse to recap what the prospect just said', () => {
+  for (const key of ['assist', 'say']) {
+    const system = MODES[key].buildSystem(null);
+    assert.match(system, /do not recap/i, `${key} should forbid recapping`);
+  }
+});
+
 test('all modes have a build function', () => {
   for (const [name, mode] of Object.entries(MODES)) {
     assert.equal(typeof mode.build, 'function', `${name}.build must be a function`);

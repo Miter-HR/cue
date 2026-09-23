@@ -46,13 +46,15 @@ const CALL_FRAME = ROLE_FRAME + CITE_FRAME;
 const SPOKEN_FRAME =
   ROLE_FRAME +
   'The person on the phone has never used Miter and does not know internal product names. ' +
-  'Speak like a sharp SDR: 1–3 short sentences, natural, one idea then a question. ' +
+  'Speak like a sharp SDR: prefer one sentence. If a question is enough, only ask the question. ' +
+  'Do not recap or restate facts they just said — they already know. Never open with "Got it", "Sounds like", or a list of their tools and headcount. ' +
   'Numbered excerpts are optional grounding. If a Guide is setup or admin detail that does not help this moment, ignore it and keep the call moving. ' +
   'Never invent pricing, customer names, or capabilities. Do not write URLs, doc titles or a Sources list. ';
 
 const MOMENT_RULES =
   'Handle the moment by type:\n' +
-  '• DISCOVERY (they describe their setup): confirm what you heard in one line, then ask the single most useful next question. Assume they know nothing about Miter. Do not pitch architecture.\n' +
+  '• DISCOVERY (they describe their setup): do not recap. Ask the single most useful next question they have not already answered. Assume they know nothing about Miter. Do not pitch architecture.\n' +
+  '• INTEREST (enough setup, or they named a painful/manual process): do not ask another discovery question. Acknowledge the last point in a few words and create interest or a next step.\n' +
   '• OBJECTION (a concern or hesitation): acknowledge in one sentence, answer with a specific fact or customer proof point, offer a next step.\n' +
   '• PRICING: value first, then point to the investment summary / proposal as the source of numbers. Never quote a figure that is not in the excerpts.\n' +
   '• COMPETITOR: no bashing. Ask what made them start looking and what matters most; state one concrete Miter strength for construction payroll where it fits.\n' +
@@ -73,7 +75,7 @@ const MODES = {
         SPOKEN_FRAME +
         'Look at the screenshot and the recent conversation, decide what the rep needs RIGHT NOW, and deliver it directly with no preamble.\n\n' +
         MOMENT_RULES + '\n' +
-        'Write in first person as the rep speaking, 1–3 short sentences, ready to say out loud. No preamble, no "Here\'s what you could say". Just the words.',
+        'Write in first person as the rep speaking, ready to say out loud. Prefer one sentence. No recap, no preamble, no "Here\'s what you could say". Just the words.',
         contextBlock
       ), aiRules);
     },
@@ -94,7 +96,7 @@ const MODES = {
         SPOKEN_FRAME +
         'Draft ONE natural, confident reply the rep can say out loud, in first person.\n\n' +
         MOMENT_RULES + '\n' +
-        'No quotes, no preamble. Write the actual words to say. 1–3 short sentences. End with a question or a clear next step when it fits.',
+        'No quotes, no preamble, no recap. Write the actual words to say. Prefer one sentence — usually just the next question.',
         contextBlock
       ), aiRules);
     },

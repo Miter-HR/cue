@@ -1,12 +1,12 @@
 // call-context.js — sales / customer-call awareness for cue.
 //
-// Replaces the interview category detector. Reads the last few "Them" turns
-// (the prospect or customer) and classifies what kind of moment the rep is in,
-// then produces two things main.js uses:
-//   1. a short playbook block for the system prompt (how to handle this moment)
-//   2. retrieval hints — extra terms appended to the knowledge-base query so
-//      the matching Slite playbook (discovery questions, kickoff process,
-//      customer references, competitor discovery, assets) ranks first.
+// Two layers:
+//   1. moment — what the last prospect turn is (pricing, objection, discovery…)
+//   2. stage — whether we still need setup, or already have enough to create
+//      interest. A call that already named tools + a manual/painful process
+//      should not keep asking disconnected discovery questions.
+//
+// main.js uses the resolved intent for the playbook block and retrieval hints.
 //
 // Pure functions, no Electron.
 
@@ -55,27 +55,91 @@ const CATEGORY_PATTERNS = {
 // the more decisive moments (money, a named competitor, a worry) beat the
 // broad ones (a feature question) when a turn contains both.
 const PRIORITY = ['pricing', 'competitor', 'objection', 'reference', 'implementation', 'discovery', 'product'];
+const HARD_MOMENTS = new Set(['pricing', 'competitor', 'objection', 'reference', 'implementation']);
+
+function prospectTurns(transcript) {
+  const them = (transcript || []).filter((t) => t.channel === 'them');
+  if (them.length) return them;
+  const all = transcript || [];
+  // One You-channel blob is the whole call. Otherwise skip the opener.
+  if (all.length <= 1) return all;
+  return all.slice(1);
+}
 
 function recentProspectText(transcript) {
-  const them = (transcript || [])
-    .filter((t) => t.channel === 'them')
-    .slice(-5)
-    .map((t) => t.text)
-    .join(' ');
-  if (them.trim()) return them;
-  // Diarization sometimes dumps the whole call onto one channel. Still classify
-  // the latest speech so a setup description or brush-off is not treated as blank.
-  return (transcript || []).slice(-3).map((t) => t.text).join(' ');
+  const turns = prospectTurns(transcript);
+  if (!turns.length) return '';
+  return turns.slice(-5).map((t) => t.text).join(' ');
+}
+
+function lastProspectText(transcript) {
+  const turns = prospectTurns(transcript);
+  return ((turns[turns.length - 1] || {}).text || '').trim();
 }
 
 function detectCallCategory(transcript) {
   if (!transcript || !transcript.length) return 'general';
-  const recentThem = recentProspectText(transcript);
-  if (!recentThem.trim()) return 'general';
+  const last = lastProspectText(transcript);
+  const recent = recentProspectText(transcript);
+  if (!last && !recent.trim()) return 'general';
+  // Hard moments win on the latest turn so an earlier brush-off does not
+  // keep the call stuck after they have moved on.
+  if (last) {
+    for (const category of PRIORITY) {
+      if (!HARD_MOMENTS.has(category)) continue;
+      if (CATEGORY_PATTERNS[category].some((re) => re.test(last))) return category;
+    }
+  }
+  const window = recent.trim() || last;
   for (const category of PRIORITY) {
-    if (CATEGORY_PATTERNS[category].some((re) => re.test(recentThem))) return category;
+    if (CATEGORY_PATTERNS[category].some((re) => re.test(window))) return category;
   }
   return 'general';
+}
+
+// What we already know from prospect-sounding lines (not the rep's pitch).
+const SLOT_PATTERNS = {
+  timeTracking: /\b(hh2|hcss|heavy ?job|raken|busybusy|exaktime|timesheets?|time tracking|field time)\b/i,
+  payroll: /\b(in-?house|adp|paychex|gusto|paycom|paylocity)\b/i,
+  erp: /\b(sage|intacct|acumatica|quickbooks|netsuite|viewpoint|vista|procore)\b/i,
+  headcount: /\b\d{2,5}\s*(employees?|people|crew|guys|field)\b/i,
+  certified: /\b(certified payroll|prevailing wage|cpr)\b/i,
+  manualPain: /\b(by hand|manual(ly)?|spreadsheet|excel|we write|hand[- ]?generat|hand[- ]?written)\b/i,
+};
+
+const ANSWERISH = /\b(we (use|do|run|have|generate|write|create)|i('m| am) not|in-?house|by hand|timesheets? are|\d+\s*(employees?|field|crew))\b/i;
+const HEARD_ME = /\b(did you hear|you hear me|i (just |already )?said|like i said|i told you)\b/i;
+
+function answerishText(text) {
+  const kept = String(text || '').split(/(?<=[.!?])\s+|\n/).filter((s) => ANSWERISH.test(s));
+  return kept.join(' ').trim();
+}
+
+function filledSlots(text) {
+  const out = {};
+  for (const [key, re] of Object.entries(SLOT_PATTERNS)) out[key] = re.test(text);
+  return out;
+}
+
+function detectCallStage(transcript) {
+  const last = lastProspectText(transcript);
+  if (HEARD_ME.test(last)) return 'advance';
+  const raw = prospectTurns(transcript).map((t) => t.text).join(' ');
+  const text = answerishText(raw) || raw;
+  const slots = filledSlots(text);
+  const n = Object.values(slots).filter(Boolean).length;
+  if (slots.manualPain && (slots.certified || slots.timeTracking || slots.payroll)) return 'advance';
+  if (n >= 3) return 'advance';
+  return 'discover';
+}
+
+function detectCallIntent(transcript) {
+  const moment = detectCallCategory(transcript);
+  if (HARD_MOMENTS.has(moment) && detectCallStage(transcript) !== 'advance') return moment;
+  if (detectCallStage(transcript) === 'advance' && (moment === 'discovery' || moment === 'general' || moment === 'product' || moment === 'objection')) {
+    return 'interest';
+  }
+  return moment;
 }
 
 // Per-category playbook guidance (for the system prompt) and retrieval hints
@@ -85,9 +149,17 @@ const PLAYBOOK = {
   discovery: {
     label: 'Discovery',
     guidance:
-      'The prospect is describing how they work today. Confirm what you heard in one short line, then ask one question that moves the call. ' +
+      'The prospect is describing how they work today. Do not repeat it back. Ask one question they have not already answered. ' +
       'They have never heard of Miter. Stay curious; do not go into implementation weeds.',
     hints: 'discovery questions must-haves payroll WFM HR benefits dimensions syncs launch-related questions',
+  },
+  interest: {
+    label: 'Interest',
+    guidance:
+      'You already have enough of how they work, or they just named a painful or manual process. Do not ask another discovery question and do not start a new survey topic (no prevailing wage, fringes, headcount, or ERP just to fill a list). ' +
+      'Do not recap the stack. React to the last thing they said in a few words — especially anything they do by hand — then one sentence that creates interest or a next step. ' +
+      'If they repeated themselves or asked if you heard them, acknowledge that point and move forward.',
+    hints: '',
   },
   objection: {
     label: 'Objection',
@@ -146,7 +218,7 @@ function playbookFor(category) {
 
 // The block main.js prepends to the system prompt.
 function buildCallContext(settings, mode, transcript) {
-  const category = detectCallCategory(transcript || []);
+  const category = detectCallIntent(transcript || []);
   const pb = playbookFor(category);
   const lines = [
     '=== Call playbook: ' + pb.label + ' ===',
@@ -162,4 +234,12 @@ function retrievalHints(category) {
   return playbookFor(category).hints || '';
 }
 
-module.exports = { detectCallCategory, buildCallContext, retrievalHints, CATEGORY_PATTERNS, PLAYBOOK };
+module.exports = {
+  detectCallCategory,
+  detectCallStage,
+  detectCallIntent,
+  buildCallContext,
+  retrievalHints,
+  CATEGORY_PATTERNS,
+  PLAYBOOK,
+};

@@ -11,7 +11,7 @@ const { MODES } = require('./src/prompts');
 const { rms16 } = require('./src/wav');
 const { createStreamingSTT } = require('./src/stt-streaming');
 const { AdaptiveVAD, AudioRingBuffer } = require('./src/vad');
-const { buildCallContext, detectCallCategory, retrievalHints } = require('./src/call-context');
+const { buildCallContext, detectCallIntent, retrievalHints } = require('./src/call-context');
 const knowledgeBase = require('./src/knowledge-base');
 const { parseTranscriptFile } = require('./src/transcript-file');
 const { startAppLink, stopAppLink, recordEvent, appLinkConsentState, revokeAppLinkCaller } = require('./src/applink');
@@ -562,7 +562,7 @@ async function runFeature(mode, userText) {
     const userBubble = def.userBubble !== null
       ? def.userBubble
       : (mode === 'ask' ? userText : mode === 'answerThis' ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"` : null);
-    const category = detectCallCategory(transcript);
+    const category = detectCallIntent(transcript);
     // Retrieval runs before llm:start so the renderer knows the numbered sources
     // the model may cite; links are rendered from this list, never from the model.
     let kbBlock = null;
