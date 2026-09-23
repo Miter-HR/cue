@@ -912,79 +912,92 @@
   }
 
   // ---- Simulating conversation (testing aid) --------------------------------
-  // With a session running, press T to switch the status to "Simulating
-  // conversation". Then T opens a line as Them, Y opens a line as You; Enter
-  // sends it through the same path a real transcription takes. Esc closes the
-  // line, Esc again leaves simulation. Ending the session leaves it too.
+  // With a session running, press S to toggle "Simulating conversation". A line
+  // editor opens with an active speaker (Them by default). T and Y switch the
+  // speaker — press them before typing (empty line) or click the speaker pill.
+  // What you type previews live in the transcript history under that speaker;
+  // Enter commits it through the same path a real transcription takes and the
+  // editor stays open for the next line. Esc (or S, or ending the session) leaves.
   let simChannel = 'them';
   const simBar = $('#sim-bar');
   const simInput = $('#sim-input');
   const simWho = $('#sim-who');
 
+  function simSetSpeaker(channel) {
+    simChannel = channel === 'you' ? 'you' : 'them';
+    simWho.textContent = simChannel === 'you' ? 'You' : 'Them';
+    simWho.className = 'sim-who ' + simChannel;
+    simInput.placeholder = simChannel === 'you' ? 'Type what you say · ↵ adds it' : 'Type what they say · ↵ adds it';
+    simPreview();
+  }
+  // Live preview in the transcript history: the floating interim row carries
+  // the speaker in its label/class, so switching speaker rebuilds it.
+  function simPreview() {
+    if (!simulating) return;
+    const text = simInput.value;
+    if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+    if (text.trim()) appendTranscriptHistoryTurn(simChannel, text, true);
+    else appendTranscriptHistoryTurn(simChannel, '…', true);
+  }
   function enterSimulation() {
     if (simulating) return;
     simulating = true;
     underlyingSttState = sttState;
     setSttState('simulating');
-    showToast('Simulating conversation — T: them · Y: you · Esc: leave', 2600);
+    simBar.classList.remove('hidden');
+    simSetSpeaker(simChannel);
+    simInput.focus();
+    showToast('Simulating conversation — T: them · Y: you · ↵: add · Esc: leave', 2800);
   }
   function leaveSimulation() {
     if (!simulating) return;
-    closeSimLine();
     simulating = false;
+    simBar.classList.add('hidden');
+    simInput.value = '';
+    simInput.blur();
+    if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
     const restore = underlyingSttState && underlyingSttState !== 'simulating' ? underlyingSttState : 'disconnected';
     underlyingSttState = null;
     setSttState(restore);
   }
-  function openSimLine(channel) {
-    simChannel = channel;
-    simWho.textContent = channel === 'you' ? 'You' : 'Them';
-    simWho.className = 'sim-who ' + channel;
-    simInput.placeholder = channel === 'you' ? 'Type what you say · Enter adds it · Esc closes' : 'Type what they say · Enter adds it · Esc closes';
-    simBar.classList.remove('hidden');
-    simInput.focus();
-  }
-  function closeSimLine() {
-    simBar.classList.add('hidden');
-    simInput.value = '';
-    simInput.blur();
-  }
   async function submitSimLine() {
     const text = simInput.value.trim();
-    if (!text) { closeSimLine(); return; }
+    if (!text) return;
     const res = await cue.simulateTranscript(simChannel, text);
     if (!res || !res.ok) showToast('Could not add line' + (res && res.reason ? ': ' + res.reason : ''), 1800);
-    closeSimLine();
+    simInput.value = '';
+    simPreview();
+    simInput.focus();
   }
+  simWho.addEventListener('click', () => { simSetSpeaker(simChannel === 'them' ? 'you' : 'them'); simInput.focus(); });
+  simInput.addEventListener('input', simPreview);
   simInput.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    const plain = !(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey);
     if (e.key === 'Enter') { e.preventDefault(); submitSimLine(); }
-    else if (e.key === 'Escape') { e.preventDefault(); closeSimLine(); }
+    else if (e.key === 'Escape') { e.preventDefault(); leaveSimulation(); }
+    else if (plain && !simInput.value && (key === 't' || key === 'y')) { e.preventDefault(); simSetSpeaker(key === 'y' ? 'you' : 'them'); }
+    else if (plain && !simInput.value && key === 's') { e.preventDefault(); leaveSimulation(); }
     e.stopPropagation();
   });
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const t = e.target;
-    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-    if (typing) return;
-    const sessionActive = $('#stop-btn').classList.contains('active');
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     const key = e.key.toLowerCase();
-    if (key === 't') {
-      if (!sessionActive) return;
+    if (key === 's') {
+      if (!$('#stop-btn').classList.contains('active')) return;
       e.preventDefault();
-      if (!simulating) enterSimulation(); else openSimLine('them');
-    } else if (key === 'y' && simulating) {
+      if (simulating) leaveSimulation(); else enterSimulation();
+    } else if (simulating && (key === 't' || key === 'y')) {
       e.preventDefault();
-      openSimLine('you');
-    } else if (e.key === 'Escape' && simulating && simBar.classList.contains('hidden')) {
+      simSetSpeaker(key === 'y' ? 'you' : 'them');
+      simInput.focus();
+    } else if (simulating && e.key === 'Escape') {
       e.preventDefault();
       leaveSimulation();
     }
   });
-
-  function updateSttStatus({ active, streaming } = {}) {
-    if (active === false) setSttState('disconnected');
-    else if (active === true) setSttState(streaming ? 'connecting' : 'batch');
-  }
 
   // ---- transcript history sidebar (hidden by default, manual toggle) ----
   let tsSidebarInterimEl = null;
