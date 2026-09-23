@@ -35,3 +35,6 @@ node_modules/electron/dist/electron.exe.bak
 knowledge-base/*
 !knowledge-base/README.md
 !knowledge-base/slite-sources.json
+
+# Real call exports used as local test data — customer names/emails, never commit
+test_transcripts/
