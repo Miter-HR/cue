@@ -15,7 +15,7 @@
   $('#logo-btn').innerHTML = icon('badge-question-mark', { size: 16 });
   $('#tb-settings-btn').innerHTML = icon('settings', { size: 16 });
   $('.tb-hide .chev').innerHTML = icon('chevron-down', { size: 14 });
-  $('#opacity-btn .ic').innerHTML = icon('eclipse', { size: 14 });
+  $('#opacity-btn .ic').innerHTML = icon('blend', { size: 15 });
   $('#quit-btn').innerHTML = icon('x', { size: 14 });
   document.querySelector('.act[data-mode="assist"] .ic').innerHTML = icon('monitor', { size: 16 });
   document.querySelector('.act[data-mode="say"] .ic').innerHTML = icon('wand-sparkles', { size: 16 });
@@ -656,8 +656,33 @@
     pop.classList.toggle('hidden', !open);
     btn.classList.toggle('on', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    document.getElementById('app').classList.toggle('opacity-open', open);
+    if (!open) clearTimeout(opacityCloseTimer);
   }
+  let opacityCloseTimer = null;
+  function closeOpacityPopoverSoon(ms) {
+    clearTimeout(opacityCloseTimer);
+    opacityCloseTimer = setTimeout(() => toggleOpacityPopover(false), ms);
+  }
+  const opacityWrap = document.querySelector('.tb-opacity-wrap');
+  // The gap between the button and the popover is outside both, so leaving waits a beat.
+  opacityWrap.addEventListener('mouseleave', () => closeOpacityPopoverSoon(400));
+  opacityWrap.addEventListener('mouseenter', () => clearTimeout(opacityCloseTimer));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleOpacityPopover(false); });
+
+  const OPACITY_WHEEL_STEP = 0.05;
+  const OPACITY_WHEEL_PX_PER_STEP = 40; // trackpads send many small deltas; one step per ~40px of scroll
+  let opacityWheelDelta = 0;
+  $('#opacity-btn').addEventListener('wheel', (e) => {
+    e.preventDefault();
+    opacityWheelDelta += e.deltaY;
+    const steps = Math.trunc(opacityWheelDelta / OPACITY_WHEEL_PX_PER_STEP);
+    if (!steps) return;
+    opacityWheelDelta -= steps * OPACITY_WHEEL_PX_PER_STEP;
+    const current = Number($('#tb-opacity-slider').value) / 100;
+    applyOpacity(current - steps * OPACITY_WHEEL_STEP, true);
+    toggleOpacityPopover(true);
+    closeOpacityPopoverSoon(1200);
+  }, { passive: false });
   $('#opacity-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleOpacityPopover();
@@ -949,7 +974,7 @@
     const historyBtn = document.getElementById('history-btn');
     if (!historyBtn) return;
     historyBtn.classList.toggle('active', open);
-    const label = open ? 'Hide conversation history' : 'Show conversation history';
+    const label = open ? 'Hide transcript' : 'Show transcript';
     const text = historyBtn.querySelector('.history-label');
     if (text) text.textContent = label;
     historyBtn.title = label;
@@ -1072,7 +1097,7 @@
 
   function clearTranscriptSidebar() {
     const list = document.getElementById('ts-list');
-    if (list) list.innerHTML = '<div class="ts-placeholder">Conversation history will appear here when listening.</div>';
+    if (list) list.innerHTML = '<div class="ts-placeholder">Start a session to see the transcript here.</div>';
     tsSidebarInterimEl = null;
     tsLastRow.you = null; tsLastRow.them = null;
     clearTimeout(tsRowTimer.you); clearTimeout(tsRowTimer.them);
@@ -1326,7 +1351,7 @@
     const actions = banner.querySelector('.mic-perm-actions');
     if (cue.platform === 'darwin') {
       const openBtn = document.createElement('button');
-      openBtn.textContent = 'Open Microphone Settings';
+      openBtn.textContent = 'Open microphone settings';
       openBtn.addEventListener('click', () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'));
       actions.appendChild(openBtn);
     }
@@ -1849,12 +1874,12 @@
     : 'cue needs two macOS permissions. Click each button, turn <strong>cue</strong> ON in the window that opens, then come back here.';
   const permissionButtons = isWindows
     ? [
-        { label: 'Open Microphone settings', action: () => cue.openPane('ms-settings:privacy-microphone') },
-        { label: 'Open Screen recording settings', action: () => cue.openPane('ms-settings:privacy-screenrecorder') }
+        { label: 'Open microphone settings', action: () => cue.openPane('ms-settings:privacy-microphone') },
+        { label: 'Open screen recording settings', action: () => cue.openPane('ms-settings:privacy-screenrecorder') }
       ]
     : [
-        { label: 'Open Microphone settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
-        { label: 'Open Screen Recording settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
+        { label: 'Open microphone settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
+        { label: 'Open screen recording settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
       ];
   const assistShortcut = isWindows ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">↵</span>' : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span>';
   const sayShortcut = isWindows ? '<span class="kbd">Ctrl</span> <span class="kbd">↵</span>' : '<span class="kbd">⌘</span> <span class="kbd">↵</span>';

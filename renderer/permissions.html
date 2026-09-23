@@ -6,8 +6,8 @@
   <title>cue — Permissions</title>
   <style>
     :root {
-      --accent: #3C83F5;
-      --accent-hi: #4A8DF7;
+      --accent: #680CBD;
+      --accent-hi: #7A22D1;
       --tx-1: rgba(255,255,255,0.95);
       --tx-2: rgba(255,255,255,0.90);
       --tx-mut: rgba(255,255,255,0.40);
@@ -76,7 +76,7 @@
     .perm-name { font-size: 14px; font-weight: 600; color: var(--tx-1); }
     .perm-status { font-size: 12px; color: var(--tx-mut); margin-top: 2px; }
     .perm-status.ok { color: #4ade80; }
-    .perm-status.bad { color: #ff8a75; }
+    .perm-status.bad { color: #fca5a5; }
     .perm-badge {
       flex-shrink: 0;
       width: 26px; height: 26px;
@@ -90,16 +90,16 @@
       flex-shrink: 0;
       padding: 6px 12px;
       border-radius: 8px;
-      border: 1px solid rgba(60,131,245,0.40);
-      background: rgba(60,131,245,0.14);
-      color: #a8ccff;
+      border: 1px solid rgba(201,167,242,0.40);
+      background: rgba(201,167,242,0.14);
+      color: #C9A7F2;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: var(--font);
       transition: all 140ms ease;
     }
-    .perm-open-btn:hover { background: rgba(60,131,245,0.24); }
+    .perm-open-btn:hover { background: rgba(201,167,242,0.24); }
     .perm-open-btn.hidden { display: none; }
 
     /* Note */
@@ -161,7 +161,7 @@
       font-weight: 600;
       cursor: pointer;
       font-family: var(--font);
-      box-shadow: 0 2px 8px rgba(60,131,245,0.45);
+      box-shadow: 0 2px 8px rgba(104,12,189,0.55);
       transition: all 160ms ease;
     }
     .perm-continue-btn:hover { filter: brightness(1.08); transform: scale(1.02); }
@@ -197,7 +197,7 @@
           <div class="perm-name">Microphone</div>
           <div class="perm-status" id="status-mic">Checking…</div>
         </div>
-        <button class="perm-open-btn no-drag" id="btn-mic">Open Settings</button>
+        <button class="perm-open-btn no-drag" id="btn-mic">Open settings</button>
         <span class="perm-badge" id="badge-mic"></span>
       </div>
 
@@ -208,19 +208,19 @@
           <div class="perm-name">Screen Recording</div>
           <div class="perm-status" id="status-screen">Checking…</div>
         </div>
-        <button class="perm-open-btn no-drag" id="btn-screen">Open Settings</button>
+        <button class="perm-open-btn no-drag" id="btn-screen">Open settings</button>
         <span class="perm-badge" id="badge-screen"></span>
       </div>
 
       <div class="perm-note">
-        <strong>Tip:</strong> After toggling a permission in System Settings, click <strong>Check Again</strong> below.
+        <strong>Tip:</strong> After toggling a permission in System Settings, click <strong>Check again</strong> below.
         If Screen Recording was just enabled, you may need to restart cue for it to take effect.
       </div>
 
       <div class="perm-actions no-drag">
         <button class="perm-ghost" id="quit-btn">Quit</button>
         <div class="spacer"></div>
-        <button class="perm-check-btn" id="check-btn">Check Again</button>
+        <button class="perm-check-btn" id="check-btn">Check again</button>
         <button class="perm-continue-btn" id="continue-btn" disabled>Continue →</button>
       </div>
     </div>
@@ -276,7 +276,7 @@
           cue.log('permissions check error: ' + e);
         } finally {
           checkBtn.classList.remove('checking');
-          checkBtn.textContent = 'Check Again';
+          checkBtn.textContent = 'Check again';
         }
       }
 
