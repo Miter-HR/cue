@@ -57,12 +57,10 @@ html, body {
   align-items: center;
   padding-top: 14px;
   pointer-events: none;                  /* only the actual UI blocks; gaps pass through */
-  opacity: var(--cue-opacity, 1);
 }
-#settings-scrim, #onboard-scrim, #consent-scrim {
-  opacity: var(--cue-opacity, 1);
-}
-#app.opacity-open { padding-top: 82px; }
+/* Opacity fades the panel (with its history sidebar and toast) but never the toolbar or
+   dialogs, so the controls for turning it back up stay findable. */
+#panel-wrap { opacity: var(--cue-opacity, 1); }
 #toolbar, #panel-wrap, #settings-scrim, #onboard-scrim, #consent-scrim { pointer-events: auto; }
 
 /* ============================ Toolbar pill ============================ */
@@ -114,16 +112,15 @@ html, body {
 .tb-opacity:hover { background: rgba(255,255,255,0.08); }
 .tb-opacity.on { background: rgba(255,255,255,0.10); }
 .opacity-popover {
-  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 60;
-  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
-  padding: 8px 12px; min-width: 180px;
+  position: absolute; top: calc(100% + 10px); left: 50%; translate: -50% 0; z-index: 60;
+  display: flex; align-items: center;
+  padding: 6px 12px;
   background: var(--bg);
   border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
+  border-radius: var(--r-pill);
   box-shadow: 0 8px 24px rgba(0,0,0,0.40);
 }
 .opacity-popover.hidden { display: none; }
-.opacity-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); }
 .opacity-row { display: flex; align-items: center; gap: 10px; }
 .opacity-popover input[type="range"], .s-opacity-row input[type="range"] {
   flex: 1; min-width: 120px; accent-color: #7FB0F9; cursor: pointer;

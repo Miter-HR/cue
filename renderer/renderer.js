@@ -656,8 +656,33 @@
     pop.classList.toggle('hidden', !open);
     btn.classList.toggle('on', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    document.getElementById('app').classList.toggle('opacity-open', open);
+    if (!open) clearTimeout(opacityCloseTimer);
   }
+  let opacityCloseTimer = null;
+  function closeOpacityPopoverSoon(ms) {
+    clearTimeout(opacityCloseTimer);
+    opacityCloseTimer = setTimeout(() => toggleOpacityPopover(false), ms);
+  }
+  const opacityWrap = document.querySelector('.tb-opacity-wrap');
+  // The gap between the button and the popover is outside both, so leaving waits a beat.
+  opacityWrap.addEventListener('mouseleave', () => closeOpacityPopoverSoon(400));
+  opacityWrap.addEventListener('mouseenter', () => clearTimeout(opacityCloseTimer));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleOpacityPopover(false); });
+
+  const OPACITY_WHEEL_STEP = 0.05;
+  const OPACITY_WHEEL_PX_PER_STEP = 40; // trackpads send many small deltas; one step per ~40px of scroll
+  let opacityWheelDelta = 0;
+  $('#opacity-btn').addEventListener('wheel', (e) => {
+    e.preventDefault();
+    opacityWheelDelta += e.deltaY;
+    const steps = Math.trunc(opacityWheelDelta / OPACITY_WHEEL_PX_PER_STEP);
+    if (!steps) return;
+    opacityWheelDelta -= steps * OPACITY_WHEEL_PX_PER_STEP;
+    const current = Number($('#tb-opacity-slider').value) / 100;
+    applyOpacity(current - steps * OPACITY_WHEEL_STEP, true);
+    toggleOpacityPopover(true);
+    closeOpacityPopoverSoon(1200);
+  }, { passive: false });
   $('#opacity-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleOpacityPopover();
