@@ -36,7 +36,7 @@ const CATEGORY_PATTERNS = {
     /\b(reference|references|talk to (a|an|another|one of your) (customer|client)|case stud(y|ies)|who else (uses|is using)|similar (companies|contractors|customers)|customers like us)\b/i,
   ],
   discovery: [
-    /\b(we (currently|today) (use|run|do|have)|right now we|our (current|existing) (system|process|setup|payroll|erp|software)|we'?re on|we (process|run) payroll)\b/i,
+    /\b(we (currently|today) (use|run|do|have)|we use|right now we|our (current|existing) (system|process|setup|payroll|erp|software)|we'?re on|we (process|run) payroll)\b/i,
     /\b(tell (you|us) (a little )?about (our|us|the company)|we have (about|around|roughly)? ?\d+ (employees|people|guys|field|crew))\b/i,
     /\b(prevailing wage|certified payroll|union|unions|fringe|fringes|davis.?bacon|multi.?state|job cost|cost codes?)\b/i,
     /\b(sage|intacct|acumatica|quickbooks|netsuite|procore|hcss|heavy ?job|viewpoint|vista|foundation|raken|busybusy|exaktime|erp)\b/i,
@@ -52,14 +52,22 @@ const CATEGORY_PATTERNS = {
 // broad ones (a feature question) when a turn contains both.
 const PRIORITY = ['pricing', 'competitor', 'objection', 'reference', 'implementation', 'discovery', 'product'];
 
-function detectCallCategory(transcript) {
-  if (!transcript || !transcript.length) return 'general';
-  const recentThem = transcript
+function recentProspectText(transcript) {
+  const them = (transcript || [])
     .filter((t) => t.channel === 'them')
     .slice(-5)
     .map((t) => t.text)
     .join(' ');
-  if (!recentThem) return 'general';
+  if (them.trim()) return them;
+  // Diarization sometimes dumps the whole call onto one channel. Still classify
+  // the latest speech so a setup description is not treated as a blank moment.
+  return (transcript || []).slice(-3).map((t) => t.text).join(' ');
+}
+
+function detectCallCategory(transcript) {
+  if (!transcript || !transcript.length) return 'general';
+  const recentThem = recentProspectText(transcript);
+  if (!recentThem.trim()) return 'general';
   for (const category of PRIORITY) {
     if (CATEGORY_PATTERNS[category].some((re) => re.test(recentThem))) return category;
   }
@@ -73,8 +81,8 @@ const PLAYBOOK = {
   discovery: {
     label: 'Discovery',
     guidance:
-      'The prospect is describing their current setup. Listen for the must-haves: headcount, current payroll provider, time-tracking method, ERP/accounting system, timeline to purchase. ' +
-      'Ask one sharp follow-up at a time from the discovery question set — prevailing wage / certified payroll, union fringes, ERP dimensions and sync expectations, benefits and 401k, and launch-blocking items (courtesy taxes, local taxes, activity-based workers comp, paper checks, integration scoping).',
+      'The prospect is describing how they work today. Confirm what you heard in one short line, then ask one question that moves the call. ' +
+      'They have never heard of Miter. Stay curious; do not go into implementation weeds.',
     hints: 'discovery questions must-haves payroll WFM HR benefits dimensions syncs launch-related questions',
   },
   objection: {
@@ -115,13 +123,14 @@ const PLAYBOOK = {
   product: {
     label: 'Product',
     guidance:
-      'A capability or how-does-it-work question. Answer from the Miter Guides excerpts when they cover it — name the feature, where it lives in the dashboard, and any setup step. If the guides do not cover it, say what you know and offer to confirm rather than guessing.',
+      'A capability or how-does-it-work question. Answer simply, as if they have never seen Miter. Skip setup and admin detail unless they asked how something works. If the guides do not cover it, say what you know and offer to confirm rather than guessing.',
     hints: '',
   },
   general: {
     label: 'General',
     guidance:
-      'Keep the conversation moving. Prefer a clarifying question or a concrete next step over a monologue.',
+      'Keep the conversation moving. Prefer a clarifying question or a concrete next step over a monologue. ' +
+      'Assume they do not know Miter. Do not pitch architecture or product internals.',
     hints: '',
   },
 };
