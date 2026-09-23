@@ -13,6 +13,17 @@ const { CURRENT_GEMINI_DEFAULT } = require('./llm');
 // Uses the dedicated transcription session type for lowest latency streaming STT
 // ============================================================================
 
+function applyTranscriptDelta(prev, delta) {
+  if (!delta) return prev || '';
+  if (!prev) return delta;
+  // whisper-1 style snapshots send the full transcript so far; streaming models
+  // send an incremental token. Prefer the longer snapshot when one contains the other.
+  if (delta.startsWith(prev) || prev.startsWith(delta)) {
+    return delta.length >= prev.length ? delta : prev;
+  }
+  return prev + delta;
+}
+
 class OpenAIRealtimeSTT {
   constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
@@ -29,6 +40,8 @@ class OpenAIRealtimeSTT {
     this._reconnectDelay = 1000;
     this._pendingAudio = [];
     this._sessionReady = false;
+    this._partials = new Map(); // item_id -> accumulated delta text
+    this._uncommitted = false;
   }
 
   async connect() {
@@ -62,7 +75,10 @@ class OpenAIRealtimeSTT {
                 transcription: {
                   model: this.model,
                   language: 'en'
-                }
+                },
+                // Dedicated transcription sessions do not support server VAD.
+                // Client VAD (main.js) calls commit() at the end of each turn.
+                turn_detection: null
               }
             }
           }
@@ -104,17 +120,23 @@ class OpenAIRealtimeSTT {
         this._flushPendingAudio();
         break;
 
-      case 'conversation.item.input_audio_transcription.delta':
-        if (event.delta) {
-          this.onInterim(event.delta);
-        }
+      case 'conversation.item.input_audio_transcription.delta': {
+        const id = event.item_id || '_';
+        const next = applyTranscriptDelta(this._partials.get(id) || '', event.delta || '');
+        this._partials.set(id, next);
+        if (next.trim()) this.onInterim(next.trim());
         break;
+      }
 
       case 'conversation.item.input_audio_transcription.completed':
-        if (event.transcript && event.transcript.trim()) {
-          this.onTranscript(event.transcript.trim());
-        }
+      case 'conversation.item.input_audio_transcription.failed': {
+        const id = event.item_id || '_';
+        const full = (event.transcript || this._partials.get(id) || '').trim();
+        this._partials.delete(id);
+        this.onInterim('');
+        if (full && !looksLikeHallucination(full)) this.onTranscript(full);
         break;
+      }
 
       case 'input_audio_buffer.speech_started':
         break;
@@ -123,6 +145,7 @@ class OpenAIRealtimeSTT {
         break;
 
       case 'input_audio_buffer.committed':
+        this._uncommitted = false;
         break;
 
       case 'error':
@@ -150,6 +173,13 @@ class OpenAIRealtimeSTT {
       type: 'input_audio_buffer.append',
       audio: b64
     });
+    this._uncommitted = true;
+  }
+
+  commit() {
+    if (!this.connected || !this._sessionReady || !this._uncommitted) return;
+    this._sendEvent({ type: 'input_audio_buffer.commit' });
+    this._uncommitted = false;
   }
 
   _resample16to24(pcm16kHz) {
@@ -178,6 +208,7 @@ class OpenAIRealtimeSTT {
         type: 'input_audio_buffer.append',
         audio: b64
       });
+      this._uncommitted = true;
     }
   }
 
@@ -202,13 +233,24 @@ class OpenAIRealtimeSTT {
   }
 
   disconnect() {
+    this._flushPartials();
     this._sessionReady = false;
     this._pendingAudio = [];
+    this._uncommitted = false;
     if (this.ws) {
       this.ws.close(1000);
       this.ws = null;
     }
     this.connected = false;
+  }
+
+  _flushPartials() {
+    for (const text of this._partials.values()) {
+      const full = (text || '').trim();
+      if (full && !looksLikeHallucination(full)) this.onTranscript(full);
+    }
+    this._partials.clear();
+    this.onInterim('');
   }
 }
 
@@ -453,5 +495,6 @@ module.exports = {
   DeepgramStreamingSTT,
   createStreamingSTT,
   transcribeBatchOpenAI,
-  transcribeBatchGemini
+  transcribeBatchGemini,
+  applyTranscriptDelta
 };
