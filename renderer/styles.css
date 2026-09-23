@@ -1004,3 +1004,19 @@ button:focus { outline: none; }
 }
 #sim-input::placeholder { color: rgba(255,255,255,0.35); }
 .sim-hint { flex: none; font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; }
+
+/* ---- Session menu (Start session / Simulate session) ---- */
+.tb-session-wrap { position: relative; display: inline-flex; align-items: center; -webkit-app-region: no-drag; }
+.tb-session-caret { width: 20px; height: 28px; border-radius: var(--r-8); color: rgba(255,255,255,0.55); display: inline-flex; align-items: center; justify-content: center; }
+.tb-session-caret:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.tb-session-caret .ic { width: 12px; height: 12px; display: inline-flex; }
+.session-popover { left: 0; min-width: 240px; padding: 6px; gap: 2px; }
+.session-item {
+  display: grid; grid-template-columns: 16px 1fr; column-gap: 8px; align-items: center; text-align: left;
+  padding: 7px 8px; border-radius: 8px; color: rgba(255,255,255,0.92); font-size: 13px; font-weight: 500;
+}
+.session-item .ic { width: 14px; height: 14px; display: inline-flex; grid-row: 1 / span 2; }
+.session-item:hover { background: rgba(255,255,255,0.08); }
+.session-item[disabled] { opacity: 0.4; pointer-events: none; }
+.session-item-sub { grid-column: 2; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.5); }
+#toolbar .tb-stop.simulating { color: #f0abfc; }

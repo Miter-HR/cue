@@ -25,16 +25,18 @@
   const clearIC = document.querySelector('#clear-transcript-btn .ic');
   if (clearIC) clearIC.innerHTML = icon('trash-2', { size: 15 });
 
-  function setSessionButton(active) {
+  function setSessionButton(active, kind) {
     const btn = $('#stop-btn');
     const ic = btn.querySelector('.ic');
     const label = btn.querySelector('.tb-stop-label');
+    const sim = active && kind === 'simulate';
     btn.classList.toggle('active', active);
+    btn.classList.toggle('simulating', sim);
     if (ic) ic.innerHTML = active
       ? icon('square', { size: 14 })
       : icon('play', { size: 14, filled: false });
-    if (label) label.textContent = active ? 'End session' : 'Start session';
-    const title = active ? 'End session' : 'Start session';
+    const title = active ? (sim ? 'End simulation' : 'End session') : 'Start session';
+    if (label) label.textContent = title;
     btn.title = title;
     btn.setAttribute('aria-label', title);
     refreshEmptyState(!!active);
@@ -667,6 +669,7 @@
   // Stop = start/stop listening. Kick off system-audio capture straight from the click so
   // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
   $('#stop-btn').addEventListener('click', async () => {
+    if (simulating) { leaveSimulation(); return; }
     const turningOn = !$('#stop-btn').classList.contains('active');
     if (turningOn) {
       // startSystemAudio may fail (user cancels, no permission) — that's OK,
@@ -912,12 +915,12 @@
   }
 
   // ---- Simulating conversation (testing aid) --------------------------------
-  // With a session running, press S to toggle "Simulating conversation". A line
-  // editor opens with an active speaker (Them by default). T and Y switch the
-  // speaker — press them before typing (empty line) or click the speaker pill.
-  // What you type previews live in the transcript history under that speaker;
-  // Enter commits it through the same path a real transcription takes and the
-  // editor stays open for the next line. Esc (or S, or ending the session) leaves.
+  // Top bar ▾ → "Simulate session". No mic or meeting audio is started; instead a
+  // line editor opens with an active speaker (Them by default). T and Y switch
+  // the speaker — press them before typing (empty line) or click the speaker
+  // pill. What you type previews live in the transcript history under that
+  // speaker; Enter commits it through the same path a real transcription takes
+  // and the editor stays open for the next line. Esc or "End simulation" leaves.
   let simChannel = 'them';
   const simBar = $('#sim-bar');
   const simInput = $('#sim-input');
@@ -936,18 +939,19 @@
     if (!simulating) return;
     const text = simInput.value;
     if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
-    if (text.trim()) appendTranscriptHistoryTurn(simChannel, text, true);
-    else appendTranscriptHistoryTurn(simChannel, '…', true);
+    appendTranscriptHistoryTurn(simChannel, text.trim() ? text : '…', true);
   }
   function enterSimulation() {
-    if (simulating) return;
+    if (simulating || $('#stop-btn').classList.contains('active')) return;
     simulating = true;
     underlyingSttState = sttState;
     setSttState('simulating');
+    setSessionButton(true, 'simulate');
+    composer.classList.add('listening');
     simBar.classList.remove('hidden');
     simSetSpeaker(simChannel);
     simInput.focus();
-    showToast('Simulating conversation — T: them · Y: you · ↵: add · Esc: leave', 2800);
+    showToast('Simulating session — T: them · Y: you · ↵: add · Esc: end', 2800);
   }
   function leaveSimulation() {
     if (!simulating) return;
@@ -956,6 +960,8 @@
     simInput.value = '';
     simInput.blur();
     if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+    setSessionButton(false);
+    composer.classList.remove('listening');
     const restore = underlyingSttState && underlyingSttState !== 'simulating' ? underlyingSttState : 'disconnected';
     underlyingSttState = null;
     setSttState(restore);
@@ -977,27 +983,38 @@
     if (e.key === 'Enter') { e.preventDefault(); submitSimLine(); }
     else if (e.key === 'Escape') { e.preventDefault(); leaveSimulation(); }
     else if (plain && !simInput.value && (key === 't' || key === 'y')) { e.preventDefault(); simSetSpeaker(key === 'y' ? 'you' : 'them'); }
-    else if (plain && !simInput.value && key === 's') { e.preventDefault(); leaveSimulation(); }
     e.stopPropagation();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (!simulating || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     const key = e.key.toLowerCase();
-    if (key === 's') {
-      if (!$('#stop-btn').classList.contains('active')) return;
-      e.preventDefault();
-      if (simulating) leaveSimulation(); else enterSimulation();
-    } else if (simulating && (key === 't' || key === 'y')) {
-      e.preventDefault();
-      simSetSpeaker(key === 'y' ? 'you' : 'them');
-      simInput.focus();
-    } else if (simulating && e.key === 'Escape') {
-      e.preventDefault();
-      leaveSimulation();
-    }
+    if (key === 't' || key === 'y') { e.preventDefault(); simSetSpeaker(key === 'y' ? 'you' : 'them'); simInput.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); leaveSimulation(); }
   });
+
+  // Session menu (▾ next to Start session)
+  const sessionWrap = document.querySelector('.tb-session-wrap');
+  const sessionPop = $('#session-popover');
+  const sessionMenuBtn = $('#session-menu-btn');
+  sessionMenuBtn.querySelector('.ic').innerHTML = icon('chevron-down', { size: 12 });
+  $('#session-start-item .ic').innerHTML = icon('play', { size: 14, filled: false });
+  $('#session-simulate-item .ic').innerHTML = icon('message-square-text', { size: 14 });
+  function toggleSessionMenu(force) {
+    const open = force != null ? !!force : sessionPop.classList.contains('hidden');
+    sessionPop.classList.toggle('hidden', !open);
+    sessionMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      const live = $('#stop-btn').classList.contains('active');
+      $('#session-start-item').toggleAttribute('disabled', live);
+      $('#session-simulate-item').toggleAttribute('disabled', live);
+    }
+  }
+  sessionMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSessionMenu(); });
+  document.addEventListener('click', (e) => { if (sessionWrap && !sessionWrap.contains(e.target)) toggleSessionMenu(false); });
+  $('#session-start-item').addEventListener('click', () => { toggleSessionMenu(false); $('#stop-btn').click(); });
+  $('#session-simulate-item').addEventListener('click', () => { toggleSessionMenu(false); enterSimulation(); });
 
   function updateSttStatus({ active, streaming } = {}) {
     if (active === false) setSttState('disconnected');

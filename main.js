@@ -892,7 +892,6 @@ ipcMain.handle('transcript:clear', () => {
 ipcMain.handle('transcript:simulate', (_e, payload) => {
   const channel = payload && payload.channel === 'you' ? 'you' : 'them';
   const text = payload && typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
-  if (!state.capturing) return { ok: false, reason: 'no active session' };
   if (!text) return { ok: false, reason: 'empty' };
   publishTranscript(channel, text);
   return { ok: true };
