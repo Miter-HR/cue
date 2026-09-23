@@ -39,7 +39,7 @@ const CATEGORY_PATTERNS = {
     /\b(we (currently|today) (use|run|do|have)|we use|right now we|our (current|existing) (system|process|setup|payroll|erp|software)|we'?re on|we (process|run) payroll)\b/i,
     /\b(tell (you|us) (a little )?about (our|us|the company)|we have (about|around|roughly)? ?\d+ (employees|people|guys|field|crew))\b/i,
     /\b(prevailing wage|certified payroll|union|unions|fringe|fringes|davis.?bacon|multi.?state|job cost|cost codes?)\b/i,
-    /\b(sage|intacct|acumatica|quickbooks|netsuite|procore|hcss|heavy ?job|viewpoint|vista|foundation|raken|busybusy|exaktime|hh2|erp)\b/i,
+    /\b(sage|intacct|acumatica|quickbooks|netsuite|procore|hcss|heavy ?job|viewpoint|vista|foundation|raken|busybusy|exaktime|erp)\b/i,
   ],
   product: [
     /\b(can (it|miter|you) (do|handle|support|integrate|sync|track|export)|does (it|miter) (do|have|handle|support|integrate|sync|track|export)|is there (a|an|any) (way|feature|report|integration)|how (does|do) (it|miter|you) (handle|do|work|sync|track))\b/i,
@@ -60,7 +60,7 @@ function recentProspectText(transcript) {
     .join(' ');
   if (them.trim()) return them;
   // Diarization sometimes dumps the whole call onto one channel. Still classify
-  // the latest speech so "we use HH2" is not treated as a blank general moment.
+  // the latest speech so a setup description is not treated as a blank moment.
   return (transcript || []).slice(-3).map((t) => t.text).join(' ');
 }
 
@@ -81,9 +81,9 @@ const PLAYBOOK = {
   discovery: {
     label: 'Discovery',
     guidance:
-      'The prospect is describing how they work today. Mirror the tool or process they named in one short line. If it is a stack Miter already works with, say we work with contractors on that — then ask one question that uncovers the next must-have (how field time hits payroll, union / certified, ERP, headcount, timing). ' +
-      'They have never heard of Miter. Do not mention Miter Connect, connection methods, or how a replacement would be set up. Stay curious; do not go into implementation weeds.',
-    hints: 'discovery questions must-haves current time tracking method payroll WFM',
+      'The prospect is describing how they work today. Confirm what you heard in one short line, then ask one question that moves the call. ' +
+      'They have never heard of Miter. Stay curious; do not go into implementation weeds.',
+    hints: 'discovery questions must-haves payroll WFM HR benefits dimensions syncs launch-related questions',
   },
   objection: {
     label: 'Objection',
@@ -123,7 +123,7 @@ const PLAYBOOK = {
   product: {
     label: 'Product',
     guidance:
-      'A capability or how-does-it-work question. Answer simply, as if they have never seen Miter. Skip setup, migration, and admin detail unless they asked how it is wired. If the guides do not cover it, say what you know and offer to confirm rather than guessing.',
+      'A capability or how-does-it-work question. Answer simply, as if they have never seen Miter. Skip setup and admin detail unless they asked how something works. If the guides do not cover it, say what you know and offer to confirm rather than guessing.',
     hints: '',
   },
   general: {
@@ -157,4 +157,4 @@ function retrievalHints(category) {
   return playbookFor(category).hints || '';
 }
 
-module.exports = { detectCallCategory, recentProspectText, buildCallContext, retrievalHints, CATEGORY_PATTERNS, PLAYBOOK };
+module.exports = { detectCallCategory, buildCallContext, retrievalHints, CATEGORY_PATTERNS, PLAYBOOK };
