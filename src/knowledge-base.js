@@ -17,6 +17,8 @@ const MIN_CHUNK_CHARS = 200;      // merge tiny trailing sections into the previ
 const DEFAULT_LIMIT = 6;          // chunks per answer
 const DEFAULT_BUDGET_CHARS = 7000; // total retrieved text per answer
 const RELOAD_CHECK_MS = 30_000;   // cheapest possible "did the folder change?" poll
+const FALLBACK_SOURCE = 'miter-guides'; // searched only when Slite (and other local notes) miss
+const PRIMARY_QUERY_COVERAGE = 0.4; // share of query tokens the primary hits must contain
 
 const STOP = new Set(('a an and are as at be but by for from has have how i if in into is it its of on or that the this to ' +
   'was we what when where which who why will with you your our they them their there here can could should would do does did ' +
@@ -36,6 +38,16 @@ function tokenize(text) {
     out.push(t);
   }
   return out;
+}
+
+function hitsCoverQuery(query, hits, minCoverage = PRIMARY_QUERY_COVERAGE) {
+  const qTokens = [...new Set(tokenize(query))];
+  if (!qTokens.length || !hits.length) return false;
+  const blob = hits.map((h) => `${h.doc.title} ${h.chunk.heading} ${h.chunk.text}`).join(' ');
+  const have = new Set(tokenize(blob));
+  let n = 0;
+  for (const t of qTokens) if (have.has(t)) n++;
+  return n / qTokens.length >= minCoverage;
 }
 
 function parseFrontmatter(md) {
@@ -177,19 +189,43 @@ class KnowledgeBase {
     return { dir: this.dir, docs: this.docs.length, chunks: this.chunks.length, bySource, loadedAt: this.loadedAt };
   }
 
-  search(query, { limit = DEFAULT_LIMIT, perDoc = 2 } = {}) {
+  _allowedChunkIds(source, excludeSource) {
+    if (!source && !excludeSource) return null;
+    const allowed = new Set();
+    for (const ch of this.chunks) {
+      const src = this.docs[ch.doc].source;
+      if (source && src !== source) continue;
+      if (excludeSource && src === excludeSource) continue;
+      allowed.add(ch.id);
+    }
+    return allowed;
+  }
+
+  search(query, { limit = DEFAULT_LIMIT, perDoc = 2, source = null, excludeSource = null } = {}) {
     this.reloadIfChanged();
     const qTokens = [...new Set(tokenize(query))];
     if (!qTokens.length || !this.chunks.length) return [];
-    const N = this.chunks.length, k1 = 1.4, b = 0.75;
+    const allowed = this._allowedChunkIds(source, excludeSource);
+    if (allowed && allowed.size === 0) return [];
+    let N = this.chunks.length;
+    let avgLen = this.avgLen;
+    if (allowed) {
+      N = allowed.size;
+      let totalLen = 0;
+      for (const cid of allowed) totalLen += this.chunks[cid].len;
+      avgLen = N ? totalLen / N : 0;
+    }
+    const k1 = 1.4, b = 0.75;
     const scores = new Map();
     for (const t of qTokens) {
       const postings = this.index.get(t);
       if (!postings) continue;
-      const idf = Math.log(1 + (N - postings.length + 0.5) / (postings.length + 0.5));
-      for (const [cid, tf] of postings) {
+      const scoped = allowed ? postings.filter(([cid]) => allowed.has(cid)) : postings;
+      if (!scoped.length) continue;
+      const idf = Math.log(1 + (N - scoped.length + 0.5) / (scoped.length + 0.5));
+      for (const [cid, tf] of scoped) {
         const len = this.chunks[cid].len;
-        const s = idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * len / this.avgLen));
+        const s = idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * len / avgLen));
         scores.set(cid, (scores.get(cid) || 0) + s);
       }
     }
@@ -218,7 +254,13 @@ class KnowledgeBase {
   // system prompt, plus the structured source list the renderer uses to turn the
   // model's [n] markers into real links. Links never come from the model.
   retrieve(query, { limit = DEFAULT_LIMIT, budgetChars = DEFAULT_BUDGET_CHARS, minScore = 1.0 } = {}) {
-    const hits = this.search(query, { limit }).filter((h) => h.score >= minScore);
+    // Prefer Slite (and any other non-guides notes). Only open the large Miter
+    // Guides corpus when those primary hits cannot ground the answer — keeps
+    // retrieval and the prompt small when internal docs are enough.
+    const primary = this.search(query, { limit, excludeSource: FALLBACK_SOURCE }).filter((h) => h.score >= minScore);
+    const hits = (primary.length && hitsCoverQuery(query, primary))
+      ? primary
+      : this.search(query, { limit, source: FALLBACK_SOURCE }).filter((h) => h.score >= minScore);
     if (!hits.length) return { block: null, sources: [] };
     const parts = [];
     const sources = [];
@@ -240,8 +282,15 @@ class KnowledgeBase {
       used += head.length + text.length + 2;
       if (truncated) break;
     }
+    const usedSources = [...new Set(sources.map((s) => s.source))];
+    const fromGuidesOnly = usedSources.length === 1 && usedSources[0] === FALLBACK_SOURCE;
+    const sourceBlurb = fromGuidesOnly
+      ? 'Numbered excerpts from the public Miter Guides. '
+      : usedSources.includes(FALLBACK_SOURCE)
+        ? 'Numbered excerpts from Miter\'s internal docs (Slite) and the public Miter Guides. '
+        : 'Numbered excerpts from Miter\'s internal docs (Slite). ';
     const block = '=== Internal knowledge base (retrieved for this question) ===\n' +
-      'Numbered excerpts from Miter\'s internal docs (Slite) and the public Miter Guides. ' +
+      sourceBlurb +
       'Cite the number in square brackets after any sentence an excerpt supports, e.g. "… 10 weeks before launch [2]." ' +
       'Prefer them over general knowledge; quote specifics (names, numbers, steps). ' +
       'If they do not answer the question, say so rather than forcing a fit.\n\n' +
@@ -260,6 +309,8 @@ module.exports = {
   tokenize,
   chunkMarkdown,
   parseFrontmatter,
+  hitsCoverQuery,
+  FALLBACK_SOURCE,
   queryFromState: KnowledgeBase.queryFromState,
   init: (dir) => shared.init(dir),
   reload: () => shared.reload(),
