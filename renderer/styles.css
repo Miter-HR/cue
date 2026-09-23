@@ -1010,7 +1010,7 @@ button:focus { outline: none; }
 .tb-session-caret { width: 20px; height: 28px; border-radius: var(--r-8); color: rgba(255,255,255,0.55); display: inline-flex; align-items: center; justify-content: center; }
 .tb-session-caret:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .tb-session-caret .ic { width: 12px; height: 12px; display: inline-flex; }
-.session-popover { left: 0; min-width: 240px; padding: 6px; gap: 2px; }
+.session-popover { top: calc(100% + 8px); bottom: auto; left: 0; min-width: 240px; padding: 6px; gap: 2px; }
 .session-item {
   display: grid; grid-template-columns: 16px 1fr; column-gap: 8px; align-items: center; text-align: left;
   padding: 7px 8px; border-radius: 8px; color: rgba(255,255,255,0.92); font-size: 13px; font-weight: 500;
