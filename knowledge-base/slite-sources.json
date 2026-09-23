@@ -5,6 +5,7 @@
     { "label": "discovery-questions",   "id": "PBy_ukZqnMZd8A", "title": "Discovery Questions" },
     { "label": "customer-references",   "id": "WMw2b1XRrftrhb", "title": "Customer References" },
     { "label": "kickoff-process",       "id": "GD2pETuv4o5TjV", "title": "Kickoff Process" },
-    { "label": "competitive-discovery", "id": "2VZ6IMrKvQligK", "title": "Competitor Discovery" }
+    { "label": "competitive-discovery", "id": "2VZ6IMrKvQligK", "title": "Competitor Discovery" },
+    { "label": "objection-handling",    "id": "pfEuAMwAfwFEQt", "title": "Objection Handling" }
   ]
 }

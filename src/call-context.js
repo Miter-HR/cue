@@ -27,6 +27,10 @@ const CATEGORY_PATTERNS = {
     /\bwhat if (it|you|miter|something) (doesn'?t|don'?t|fails?|breaks?|goes wrong)\b/i,
     /\b(we'?ve been burned|last (vendor|time|switch)|switching (is|was) (painful|hard))\b/i,
     /\bwhy (should|would) we\b/i,
+    // Status-quo / no-need — the most common cold-call brush-off, and the one
+    // the Objection Handling doc is written for.
+    /\b(not looking|not interested|we'?re good|we are good|all set|we'?re all set|don'?t need|no need|not in the market)\b/i,
+    /\b(happy with (what we have|our (current )?(setup|system|process|payroll|vendor|provider))|another vendor|in-?house)\b/i,
   ],
   implementation: [
     /\b(implement|implementation|onboard|onboarding|kick.?off|go.?live|launch|timeline|how long (does|will) (it|this|setup) take|migrate|migration|data (import|transfer|load)|parallel (run|payroll)|cut.?over|rocketlane|training)\b/i,
@@ -60,7 +64,7 @@ function recentProspectText(transcript) {
     .join(' ');
   if (them.trim()) return them;
   // Diarization sometimes dumps the whole call onto one channel. Still classify
-  // the latest speech so a setup description is not treated as a blank moment.
+  // the latest speech so a setup description or brush-off is not treated as blank.
   return (transcript || []).slice(-3).map((t) => t.text).join(' ');
 }
 
@@ -88,9 +92,10 @@ const PLAYBOOK = {
   objection: {
     label: 'Objection',
     guidance:
-      'The prospect raised a concern. Acknowledge it plainly in one sentence, then answer with a specific fact — how Miter actually handles it, a customer who had the same worry, or a step in the implementation process that de-risks it. ' +
-      'Never argue and never over-promise. If the honest answer is a workaround or a limitation, say so and frame the path forward.',
-    hints: 'customer references reference program discovery questions launch-related questions to confirm',
+      'The prospect raised a concern or a status-quo brush-off (payroll in-house, happy with what they have, not looking for another vendor). ' +
+      'Acknowledge it plainly in one sentence, then use the matching talk track from the Objection Handling excerpts — do not invent a new angle. ' +
+      'Never argue and never over-promise. If the honest answer is a workaround, a later follow-up, or a genuine bad fit, say so.',
+    hints: 'objection handling we do payroll in-house we\'re happy with what we have not looking for another vendor',
   },
   pricing: {
     label: 'Pricing',
