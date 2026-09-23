@@ -999,6 +999,11 @@
     }
   });
 
+  function updateSttStatus({ active, streaming } = {}) {
+    if (active === false) setSttState('disconnected');
+    else if (active === true) setSttState(streaming ? 'connecting' : 'batch');
+  }
+
   // ---- transcript history sidebar (hidden by default, manual toggle) ----
   let tsSidebarInterimEl = null;
   let sidebarOpen = false;
