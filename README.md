@@ -184,6 +184,7 @@ cue is hidden from most screen-share tools automatically — **Google Meet, Micr
 - **`⌘` `↵` — What should I say?** Suggests what to say next from the conversation. Works from anywhere.
 - **`⌘` `⇧` `↵` — Smart assist.** The do-the-smart-thing key. Looks at the screen and the conversation and tells you what to say. Works from anywhere.
 - **Simulate a session (testing).** Click the **▾** next to *Start session* and choose **Simulate session**. No audio is captured; a line editor opens instead. **`T`** makes the speaker **Them**, **`Y`** makes it **You** (press before typing, or click the speaker pill). What you type previews live in the transcript history; `↵` adds it exactly as a real transcription would. `Esc` or **End simulation** leaves.
+- **Load a transcript file (testing).** **▾ → Load transcript file…** replays a saved transcript into the history so you can hit *What should I say?* immediately. Plain text with `Them:` / `You:` line prefixes (see `fixtures/transcripts/discovery-call.txt`) or JSON `[{"channel":"them","text":"…"}]`.
 - **Start session / End session** (top bar) — start or stop **listening** to a meeting. The green dot means it's live.
 - **Type a question** in the box and press `↵` to ask about your screen or conversation.
 - **Smart** — flip it on for a smarter, more thorough model; off for fast and cheap.

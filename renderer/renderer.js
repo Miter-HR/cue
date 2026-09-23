@@ -1001,6 +1001,7 @@
   sessionMenuBtn.querySelector('.ic').innerHTML = icon('chevron-down', { size: 12 });
   $('#session-start-item .ic').innerHTML = icon('play', { size: 14, filled: false });
   $('#session-simulate-item .ic').innerHTML = icon('message-square-text', { size: 14 });
+  $('#session-load-item .ic').innerHTML = icon('refresh-cw', { size: 14 });
   function toggleSessionMenu(force) {
     const open = force != null ? !!force : sessionPop.classList.contains('hidden');
     sessionPop.classList.toggle('hidden', !open);
@@ -1009,12 +1010,26 @@
       const live = $('#stop-btn').classList.contains('active');
       $('#session-start-item').toggleAttribute('disabled', live);
       $('#session-simulate-item').toggleAttribute('disabled', live);
+      $('#session-load-item').toggleAttribute('disabled', live && !simulating);
     }
   }
   sessionMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSessionMenu(); });
   document.addEventListener('click', (e) => { if (sessionWrap && !sessionWrap.contains(e.target)) toggleSessionMenu(false); });
   $('#session-start-item').addEventListener('click', () => { toggleSessionMenu(false); $('#stop-btn').click(); });
   $('#session-simulate-item').addEventListener('click', () => { toggleSessionMenu(false); enterSimulation(); });
+  $('#session-load-item').addEventListener('click', async () => {
+    toggleSessionMenu(false);
+    if (!simulating) enterSimulation();
+    const res = await cue.loadTranscriptFile();
+    if (!res || res.canceled) { simInput.focus(); return; }
+    if (res.error) { showToast(res.error, 2600); simInput.focus(); return; }
+    // The replayed lines arrive via the normal 'transcript' events; drop the
+    // preview row so it sits below them, then give focus back to the editor.
+    if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+    simPreview();
+    showToast('Loaded ' + res.count + ' lines from ' + res.fileName, 2200);
+    simInput.focus();
+  });
 
   function updateSttStatus({ active, streaming } = {}) {
     if (active === false) setSttState('disconnected');

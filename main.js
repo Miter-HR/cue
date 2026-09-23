@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell, dialog, systemPreferences } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 const store = require('./src/store');
 const { captureScreenshot } = require('./src/screen');
@@ -12,6 +13,7 @@ const { createStreamingSTT } = require('./src/stt-streaming');
 const { AdaptiveVAD, AudioRingBuffer } = require('./src/vad');
 const { buildCallContext, detectCallCategory, retrievalHints } = require('./src/call-context');
 const knowledgeBase = require('./src/knowledge-base');
+const { parseTranscriptFile } = require('./src/transcript-file');
 const { startAppLink, stopAppLink, recordEvent, appLinkConsentState, revokeAppLinkCaller } = require('./src/applink');
 const publik = require('./src/publik');
 // The app token release.yml baked into src/publik-build.json (empty in a dev
@@ -889,6 +891,31 @@ ipcMain.handle('transcript:clear', () => {
 // Testing aid: the renderer's "Simulating conversation" mode types a line as
 // Them or You. It goes through publishTranscript, so it reaches the transcript
 // buffer, the sidebar and the composer exactly like a real transcription would.
+// Testing aid: load a saved transcript (Them: / You: lines, or JSON) and replay
+// it into the transcript through publishTranscript, so "What should I say?"
+// can be exercised against a realistic history in one click.
+ipcMain.handle('transcript:load-file', async () => {
+  const picked = await dialog.showOpenDialog(win, {
+    title: 'Load a test transcript',
+    properties: ['openFile'],
+    filters: [{ name: 'Transcript', extensions: ['txt', 'md', 'json'] }]
+  });
+  if (picked.canceled || !picked.filePaths.length) return { canceled: true };
+  const file = picked.filePaths[0];
+  let turns;
+  try { turns = parseTranscriptFile(fs.readFileSync(file, 'utf8')); }
+  catch (e) { return { canceled: false, error: (e && e.message) || String(e) }; }
+  if (!turns.length) return { canceled: false, error: 'No "Them:" or "You:" lines found in ' + path.basename(file) };
+  // Spread timestamps so the renderer's 10 s same-speaker merge still groups
+  // consecutive lines the way it would live, while preserving order.
+  const base = Date.now() - turns.length * 1000;
+  turns.forEach((t, i) => {
+    const turn = { channel: t.channel, text: t.text.slice(0, 2000), ts: base + i * 1000 };
+    pushTranscript(turn);
+    send('transcript', turn);
+  });
+  return { canceled: false, count: turns.length, fileName: path.basename(file) };
+});
 ipcMain.handle('transcript:simulate', (_e, payload) => {
   const channel = payload && payload.channel === 'you' ? 'you' : 'them';
   const text = payload && typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
