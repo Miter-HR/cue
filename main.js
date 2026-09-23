@@ -112,14 +112,20 @@ const vad = {
     offsetThreshold: 130,
     silenceFrames: 18,       // ~540ms silence before end
     onSpeechStart: () => send('vad:state', { channel: 'you', speaking: true }),
-    onSpeechEnd: (dur) => send('vad:state', { channel: 'you', speaking: false, durationMs: dur })
+    onSpeechEnd: (dur) => {
+      send('vad:state', { channel: 'you', speaking: false, durationMs: dur });
+      if (streamingSTT.you && typeof streamingSTT.you.commit === 'function') streamingSTT.you.commit();
+    }
   }),
   them: new AdaptiveVAD({
     onsetThreshold: 200,
     offsetThreshold: 120,
     silenceFrames: 20,       // ~600ms for remote audio (more forgiving)
     onSpeechStart: () => send('vad:state', { channel: 'them', speaking: true }),
-    onSpeechEnd: (dur) => send('vad:state', { channel: 'them', speaking: false, durationMs: dur })
+    onSpeechEnd: (dur) => {
+      send('vad:state', { channel: 'them', speaking: false, durationMs: dur });
+      if (streamingSTT.them && typeof streamingSTT.them.commit === 'function') streamingSTT.them.commit();
+    }
   })
 };
 // Pre-speech ring buffers (300ms) so we never clip the start of a word
