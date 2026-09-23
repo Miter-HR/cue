@@ -894,8 +894,9 @@ button:focus { outline: none; }
 /* Toast */
 #toast {
   display: none; position: absolute; top: calc(100% + 12px); left: 50%; translate: -50% 0;
-  background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.35);
-  color: #a7f3c8; font-size: 12.5px; padding: 7px 16px; border-radius: var(--r-pill);
+  background: var(--panel-bg); border: 1px solid var(--bd-hair);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.08);
+  color: #86efac; font-size: 12.5px; font-weight: 500; padding: 7px 16px; border-radius: var(--r-pill);
   z-index: 50; white-space: nowrap; pointer-events: none;
 }
 #toast.show { display: block; animation: fadeUp 200ms ease both; }
