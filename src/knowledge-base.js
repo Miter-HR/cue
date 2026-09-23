@@ -309,8 +309,6 @@ module.exports = {
   tokenize,
   chunkMarkdown,
   parseFrontmatter,
-  hitsCoverQuery,
-  FALLBACK_SOURCE,
   queryFromState: KnowledgeBase.queryFromState,
   init: (dir) => shared.init(dir),
   reload: () => shared.reload(),
