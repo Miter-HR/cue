@@ -183,6 +183,7 @@ cue is hidden from most screen-share tools automatically — **Google Meet, Micr
 
 - **`⌘` `↵` — What should I say?** Suggests what to say next from the conversation. Works from anywhere.
 - **`⌘` `⇧` `↵` — Smart assist.** The do-the-smart-thing key. Looks at the screen and the conversation and tells you what to say. Works from anywhere.
+- **Sources on every answer.** Each answer ends with clickable **Sources** chips. The model cites numbered knowledge-base excerpts inline (`[2]`), and cue maps those numbers to the real Slite or Miter Guides link — links never come from the model, so a made-up URL cannot appear. An answer that cites nothing is flagged *unverified*.
 - **Start session / End session** (top bar) — start or stop **listening** to a meeting. The green dot means it's live.
 - **Type a question** in the box and press `↵` to ask about your screen or conversation.
 - **Smart** — flip it on for a smarter, more thorough model; off for fast and cheap.

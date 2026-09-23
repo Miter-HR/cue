@@ -60,6 +60,7 @@
   let aiEl = null;       // current streaming <div class="ai-text">
   let caretEl = null;
   let responseCount = 0;
+  let currentSources = [];   // numbered knowledge-base sources for the answer in flight (from llm:start)
   const MAX_RESPONSES = 20;
 
   const messages = $('#messages');
@@ -73,7 +74,11 @@
     const flushP = () => { if (buf.length) { html += '<p>' + inline(buf.join(' ')) + '</p>'; buf = []; } };
     const inline = (s) => esc(s)
       .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[(\d{1,2})\]/g, (m, n) => {
+        const src = currentSources[Number(n) - 1];
+        return src ? '<sup class="cite" data-n="' + n + '" title="' + esc(src.title) + '">' + n + '</sup>' : m;
+      });
     for (const raw of lines) {
       const line = raw;
       if (/^```/.test(line.trim())) {
@@ -162,12 +167,65 @@
     }
   }
 
-  function finalizeAi() {
+  function finalizeAi(isError) {
     if (!aiEl) return;
     const raw = aiEl.dataset.raw || '';
     aiEl.innerHTML = renderMarkdown(raw);
+    if (!isError) aiEl.appendChild(renderSources(raw));
     aiEl = null; caretEl = null;
   }
+
+  // Sources footer. Only sources the model actually cited with [n] appear, and
+  // every link is the URL the knowledge base holds for that excerpt — the model
+  // never supplies a link, so a hallucinated URL cannot appear here.
+  function renderSources(raw) {
+    const box = document.createElement('div');
+    box.className = 'sources';
+    const cited = new Set();
+    for (const m of raw.matchAll(/\[(\d{1,2})\]/g)) { const i = Number(m[1]); if (currentSources[i - 1]) cited.add(i); }
+    if (!currentSources.length) {
+      box.classList.add('sources-empty');
+      box.textContent = 'No matching docs in the knowledge base — answer is not grounded.';
+      return box;
+    }
+    if (!cited.size) {
+      box.classList.add('sources-empty');
+      box.textContent = 'No sources cited — treat as unverified.';
+      return box;
+    }
+    const label = document.createElement('span');
+    label.className = 'sources-label';
+    label.textContent = 'Sources';
+    box.appendChild(label);
+    const seen = new Set();
+    for (const i of [...cited].sort((a, b) => a - b)) {
+      const s = currentSources[i - 1];
+      const key = s.url || s.file;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const chip = document.createElement(s.url ? 'a' : 'span');
+      chip.className = 'src-chip src-' + s.source;
+      chip.innerHTML = '<span class="src-n">' + i + '</span>' + esc(s.title) + (s.heading && s.heading !== s.title ? ' <span class="src-h">› ' + esc(s.heading) + '</span>' : '');
+      if (s.url) { chip.href = s.url; chip.dataset.url = s.url; chip.title = s.url; }
+      box.appendChild(chip);
+    }
+    return box;
+  }
+  // Open cited sources in the system browser (only http(s) URLs from the KB list).
+  messages.addEventListener('click', (e) => {
+    const chip = e.target.closest && e.target.closest('.src-chip[data-url]');
+    const sup = e.target.closest && e.target.closest('sup.cite');
+    let url = chip ? chip.dataset.url : null;
+    if (!url && sup) {
+      const group = sup.closest('.ai-text');
+      const target = group && group.querySelector('.src-chip[data-url] .src-n');
+      const s = currentSources[Number(sup.dataset.n) - 1];
+      url = s && s.url ? s.url : (target ? target.parentElement.dataset.url : null);
+    }
+    if (!url) return;
+    e.preventDefault();
+    if (/^https?:\/\//i.test(url)) cue.openPane(url);
+  });
 
   let busyFailsafe = null;
   function setBusy(v) {
@@ -1187,7 +1245,8 @@
   cue.on('vad:state', ({ channel, speaking }) => {
     setLiveDotState(speaking ? 'speaking' : 'idle');
   });
-  cue.on('llm:start', ({ userBubble, small, category }) => {
+  cue.on('llm:start', ({ userBubble, small, category, sources }) => {
+    currentSources = Array.isArray(sources) ? sources : [];
     dismissEmptyState();
     responseCount++;
     if (responseCount > MAX_RESPONSES) {
@@ -1231,7 +1290,7 @@
   cue.on('llm:done', () => { finalizeAi(); setBusy(false); });
   cue.on('llm:error', ({ message, action }) => {
     if (!aiEl) startAi(true);
-    aiEl.dataset.raw = message; finalizeAi(); setBusy(false);
+    aiEl.dataset.raw = message; finalizeAi(true); setBusy(false);
     // publik errors carry one action: the renderer's markdown emits no anchors,
     // so a link needs a real button (same pattern as the mic banner).
     if (action && action.kind === 'card') { showPublikCard(); return; }

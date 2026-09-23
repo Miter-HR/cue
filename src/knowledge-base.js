@@ -214,30 +214,43 @@ class KnowledgeBase {
     return [userText, ...them, ...you].filter(Boolean).join('\n').slice(-2500);
   }
 
-  // The block main.js prepends to the system prompt. null when nothing relevant.
-  buildKnowledgeBlock(query, { limit = DEFAULT_LIMIT, budgetChars = DEFAULT_BUDGET_CHARS, minScore = 1.0 } = {}) {
+  // Retrieve for a prompt: the numbered excerpt block main.js prepends to the
+  // system prompt, plus the structured source list the renderer uses to turn the
+  // model's [n] markers into real links. Links never come from the model.
+  retrieve(query, { limit = DEFAULT_LIMIT, budgetChars = DEFAULT_BUDGET_CHARS, minScore = 1.0 } = {}) {
     const hits = this.search(query, { limit }).filter((h) => h.score >= minScore);
-    if (!hits.length) return null;
+    if (!hits.length) return { block: null, sources: [] };
     const parts = [];
+    const sources = [];
     let used = 0;
     for (const h of hits) {
+      const n = sources.length + 1;
       const where = [h.doc.title, h.chunk.heading].filter(Boolean).join(' › ');
-      const head = `[${h.doc.source}] ${where}${h.doc.url ? ` (${h.doc.url})` : ''}`;
-      const text = h.chunk.text;
+      const head = `[${n}] ${where}  (${h.doc.source})`;
+      let text = h.chunk.text;
+      let truncated = false;
       if (used + head.length + text.length > budgetChars) {
         const room = budgetChars - used - head.length - 1;
-        if (room > 300) parts.push(head + '\n' + text.slice(0, room) + '…');
-        break;
+        if (room <= 300) break;
+        text = text.slice(0, room) + '…';
+        truncated = true;
       }
       parts.push(head + '\n' + text);
+      sources.push({ n, title: h.doc.title, heading: h.chunk.heading || '', url: h.doc.url || '', source: h.doc.source, file: h.doc.file });
       used += head.length + text.length + 2;
+      if (truncated) break;
     }
-    return '=== Internal knowledge base (retrieved for this question) ===\n' +
-      'The excerpts below come from Miter\'s internal docs (Slite) and the public Miter Guides. ' +
-      'Prefer them over general knowledge when they are relevant; quote specifics (names, numbers, steps). ' +
-      'If they do not answer the question, ignore them rather than forcing a fit.\n\n' +
+    const block = '=== Internal knowledge base (retrieved for this question) ===\n' +
+      'Numbered excerpts from Miter\'s internal docs (Slite) and the public Miter Guides. ' +
+      'Cite the number in square brackets after any sentence an excerpt supports, e.g. "… 10 weeks before launch [2]." ' +
+      'Prefer them over general knowledge; quote specifics (names, numbers, steps). ' +
+      'If they do not answer the question, say so rather than forcing a fit.\n\n' +
       parts.join('\n\n---\n\n');
+    return { block, sources };
   }
+
+  // Back-compat: block only.
+  buildKnowledgeBlock(query, opts) { return this.retrieve(query, opts).block; }
 }
 
 const shared = new KnowledgeBase();
@@ -252,6 +265,7 @@ module.exports = {
   reload: () => shared.reload(),
   search: (q, o) => shared.search(q, o),
   buildKnowledgeBlock: (q, o) => shared.buildKnowledgeBlock(q, o),
+  retrieve: (q, o) => shared.retrieve(q, o),
   stats: () => shared.stats(),
   isReady: () => shared.ready
 };
