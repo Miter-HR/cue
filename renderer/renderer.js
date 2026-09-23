@@ -15,7 +15,7 @@
   $('#logo-btn').innerHTML = icon('badge-question-mark', { size: 16 });
   $('#tb-settings-btn').innerHTML = icon('settings', { size: 16 });
   $('.tb-hide .chev').innerHTML = icon('chevron-down', { size: 14 });
-  $('#opacity-btn .ic').innerHTML = icon('eclipse', { size: 14 });
+  $('#opacity-btn .ic').innerHTML = icon('blend', { size: 15 });
   $('#quit-btn').innerHTML = icon('x', { size: 14 });
   document.querySelector('.act[data-mode="assist"] .ic').innerHTML = icon('monitor', { size: 16 });
   document.querySelector('.act[data-mode="say"] .ic').innerHTML = icon('wand-sparkles', { size: 16 });
@@ -974,7 +974,7 @@
     const historyBtn = document.getElementById('history-btn');
     if (!historyBtn) return;
     historyBtn.classList.toggle('active', open);
-    const label = open ? 'Hide conversation history' : 'Show conversation history';
+    const label = open ? 'Hide transcript' : 'Show transcript';
     const text = historyBtn.querySelector('.history-label');
     if (text) text.textContent = label;
     historyBtn.title = label;
@@ -1097,7 +1097,7 @@
 
   function clearTranscriptSidebar() {
     const list = document.getElementById('ts-list');
-    if (list) list.innerHTML = '<div class="ts-placeholder">Conversation history will appear here when listening.</div>';
+    if (list) list.innerHTML = '<div class="ts-placeholder">Start a session to see the transcript here.</div>';
     tsSidebarInterimEl = null;
     tsLastRow.you = null; tsLastRow.them = null;
     clearTimeout(tsRowTimer.you); clearTimeout(tsRowTimer.them);
@@ -1351,7 +1351,7 @@
     const actions = banner.querySelector('.mic-perm-actions');
     if (cue.platform === 'darwin') {
       const openBtn = document.createElement('button');
-      openBtn.textContent = 'Open Microphone Settings';
+      openBtn.textContent = 'Open microphone settings';
       openBtn.addEventListener('click', () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'));
       actions.appendChild(openBtn);
     }
@@ -1874,12 +1874,12 @@
     : 'cue needs two macOS permissions. Click each button, turn <strong>cue</strong> ON in the window that opens, then come back here.';
   const permissionButtons = isWindows
     ? [
-        { label: 'Open Microphone settings', action: () => cue.openPane('ms-settings:privacy-microphone') },
-        { label: 'Open Screen recording settings', action: () => cue.openPane('ms-settings:privacy-screenrecorder') }
+        { label: 'Open microphone settings', action: () => cue.openPane('ms-settings:privacy-microphone') },
+        { label: 'Open screen recording settings', action: () => cue.openPane('ms-settings:privacy-screenrecorder') }
       ]
     : [
-        { label: 'Open Microphone settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
-        { label: 'Open Screen Recording settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
+        { label: 'Open microphone settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
+        { label: 'Open screen recording settings', action: () => cue.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
       ];
   const assistShortcut = isWindows ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">↵</span>' : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span>';
   const sayShortcut = isWindows ? '<span class="kbd">Ctrl</span> <span class="kbd">↵</span>' : '<span class="kbd">⌘</span> <span class="kbd">↵</span>';
