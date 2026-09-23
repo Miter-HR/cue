@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell, dialog, systemPreferences } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 const store = require('./src/store');
 const { captureScreenshot } = require('./src/screen');
@@ -12,6 +13,7 @@ const { createStreamingSTT } = require('./src/stt-streaming');
 const { AdaptiveVAD, AudioRingBuffer } = require('./src/vad');
 const { buildCallContext, detectCallCategory, retrievalHints } = require('./src/call-context');
 const knowledgeBase = require('./src/knowledge-base');
+const { parseTranscriptFile } = require('./src/transcript-file');
 const { startAppLink, stopAppLink, recordEvent, appLinkConsentState, revokeAppLinkCaller } = require('./src/applink');
 const publik = require('./src/publik');
 // The app token release.yml baked into src/publik-build.json (empty in a dev
@@ -555,7 +557,16 @@ async function runFeature(mode, userText) {
       ? def.userBubble
       : (mode === 'ask' ? userText : mode === 'answerThis' ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"` : null);
     const category = detectCallCategory(transcript);
-    send('llm:start', { userBubble, small: !!def.small, category });
+    // Retrieval runs before llm:start so the renderer knows the numbered sources
+    // the model may cite; links are rendered from this list, never from the model.
+    let kbBlock = null;
+    let kbSources = [];
+    if (settings.knowledgeBase !== false && knowledgeBase.isReady()) {
+      const kbQuery = [knowledgeBase.queryFromState({ transcript, userText: userText || '' }), retrievalHints(category)].filter(Boolean).join('\n');
+      const budget = settings.smart ? { limit: 10, budgetChars: 12000 } : { limit: 6, budgetChars: 7000 };
+      ({ block: kbBlock, sources: kbSources } = knowledgeBase.retrieve(kbQuery, budget));
+    }
+    send('llm:start', { userBubble, small: !!def.small, category, sources: kbSources });
 
     if (!llm.ready) {
       const message = llm.configurationError || ('Complete the ' + settings.provider + ' provider settings. Model: ' + (llm.model || 'unset') + '.');
@@ -600,17 +611,6 @@ async function runFeature(mode, userText) {
     }
 
     const settingsForPrompt = store.getSettings();
-    // Local knowledge base (knowledge-base/**/*.md): retrieve the chunks most
-    // relevant to what was just said / asked and hand them to the model as part
-    // of the system prompt. The detected call moment adds hint terms so the
-    // matching Slite playbook (kickoff, references, discovery…) ranks first, and
-    // Smart mode buys a wider retrieval budget.
-    let kbBlock = null;
-    if (settingsForPrompt.knowledgeBase !== false && knowledgeBase.isReady()) {
-      const kbQuery = [knowledgeBase.queryFromState({ transcript, userText: userText || '' }), retrievalHints(category)].filter(Boolean).join('\n');
-      const budget = settingsForPrompt.smart ? { limit: 10, budgetChars: 12000 } : { limit: 6, budgetChars: 7000 };
-      kbBlock = knowledgeBase.buildKnowledgeBlock(kbQuery, budget);
-    }
     const contextBlock = [buildCallContext(settingsForPrompt, mode, transcript), kbBlock].filter(Boolean).join('\n\n') || null;
     const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : (def.system || '');
     const built = def.build({ transcript, userText: userText || '' });
@@ -890,6 +890,41 @@ ipcMain.handle('platform:info', () => ({
 }));
 ipcMain.handle('transcript:clear', () => {
   transcript.splice(0, transcript.length);
+  return { ok: true };
+});
+// Testing aid: the renderer's "Simulating conversation" mode types a line as
+// Them or You. It goes through publishTranscript, so it reaches the transcript
+// buffer, the sidebar and the composer exactly like a real transcription would.
+// Testing aid: load a saved transcript (Them: / You: lines, or JSON) and replay
+// it into the transcript through publishTranscript, so "What should I say?"
+// can be exercised against a realistic history in one click.
+ipcMain.handle('transcript:load-file', async () => {
+  const picked = await dialog.showOpenDialog(win, {
+    title: 'Load a test transcript',
+    properties: ['openFile'],
+    filters: [{ name: 'Transcript', extensions: ['txt', 'md', 'json'] }]
+  });
+  if (picked.canceled || !picked.filePaths.length) return { canceled: true };
+  const file = picked.filePaths[0];
+  let turns;
+  try { turns = parseTranscriptFile(fs.readFileSync(file, 'utf8')); }
+  catch (e) { return { canceled: false, error: (e && e.message) || String(e) }; }
+  if (!turns.length) return { canceled: false, error: 'No "Them:" or "You:" lines found in ' + path.basename(file) };
+  // Spread timestamps so the renderer's 10 s same-speaker merge still groups
+  // consecutive lines the way it would live, while preserving order.
+  const base = Date.now() - turns.length * 1000;
+  turns.forEach((t, i) => {
+    const turn = { channel: t.channel, text: t.text.slice(0, 2000), ts: base + i * 1000 };
+    pushTranscript(turn);
+    send('transcript', turn);
+  });
+  return { canceled: false, count: turns.length, fileName: path.basename(file) };
+});
+ipcMain.handle('transcript:simulate', (_e, payload) => {
+  const channel = payload && payload.channel === 'you' ? 'you' : 'them';
+  const text = payload && typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
+  if (!text) return { ok: false, reason: 'empty' };
+  publishTranscript(channel, text);
   return { ok: true };
 });
 ipcMain.on('ask', (_e, payload) => runFeature(payload.mode, payload.text));

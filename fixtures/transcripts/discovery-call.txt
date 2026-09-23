@@ -1,0 +1,11 @@
+# Sample discovery call for cue's "Load transcript file…" (Them = prospect, You = Miter rep)
+You: Thanks for making time. Before I show anything, can you walk me through how payroll works for you today?
+Them: Sure. We're about 140 people, roughly 110 in the field. Payroll is on ADP right now and our office manager keys hours in from paper timesheets every Monday.
+You: Got it. Are any of those jobs prevailing wage?
+Them: Most of the public work is. We do a lot of DOT and school district jobs, so we're producing certified payroll reports every week, and honestly it's a mess. She spends most of Tuesday on it.
+You: And on the accounting side?
+Them: We moved to Sage Intacct last year. Job costing lives there. ADP doesn't talk to it, so we re-key everything by cost code.
+Them: We're also looking at Paychex, they came in last week. What does it cost per employee with you guys?
+You: Fair question, I'll cover pricing at the end once I understand scope. Are you signatory to any unions?
+Them: Two locals, operators and laborers. Fringe rates change every June and it always breaks something.
+Them: If we did move, how long does it take to get live? We got burned on the ADP switch, that took six months.
