@@ -17,6 +17,27 @@ const MIN_CHUNK_CHARS = 200;      // merge tiny trailing sections into the previ
 const DEFAULT_LIMIT = 6;          // chunks per answer
 const DEFAULT_BUDGET_CHARS = 7000; // total retrieved text per answer
 const RELOAD_CHECK_MS = 30_000;   // cheapest possible "did the folder change?" poll
+const SPOKEN_MODES = new Set(['assist', 'say']);
+const WEEDY_PATH = /(?:^|\/)(?:integrations|troubleshooting|go-live|migrat|connecting-|checklist|data-mapping)/i;
+const WEEDY_TEXT = /\bmiter connect\b|new connections should|deprecated|synchronization client|how to fix|before you start|install the (miter connect|desktop)|connect direct/i;
+
+// Assist / Say are words the prospect hears. Admin/setup Guides (Miter Connect,
+// migrate from hh2, go-live checklists) do not belong in the numbered excerpts
+// — they get a one-line background note so the model knows we can work with
+// the stack without pitching the wiring.
+function isSpokenMode(mode) {
+  return SPOKEN_MODES.has(mode);
+}
+
+function isImplementationWeed(hit) {
+  if (!hit || !hit.doc) return false;
+  if ((hit.doc.source || '') !== 'miter-guides') return false;
+  const file = hit.doc.file || '';
+  const heading = (hit.chunk && hit.chunk.heading) || '';
+  const text = (hit.chunk && hit.chunk.text) || '';
+  if (WEEDY_PATH.test(file) || WEEDY_PATH.test(heading)) return true;
+  return WEEDY_TEXT.test(`${heading}\n${text}`);
+}
 
 const STOP = new Set(('a an and are as at be but by for from has have how i if in into is it its of on or that the this to ' +
   'was we what when where which who why will with you your our they them their there here can could should would do does did ' +
@@ -217,9 +238,13 @@ class KnowledgeBase {
   // Retrieve for a prompt: the numbered excerpt block main.js prepends to the
   // system prompt, plus the structured source list the renderer uses to turn the
   // model's [n] markers into real links. Links never come from the model.
-  retrieve(query, { limit = DEFAULT_LIMIT, budgetChars = DEFAULT_BUDGET_CHARS, minScore = 1.0 } = {}) {
-    const hits = this.search(query, { limit }).filter((h) => h.score >= minScore);
-    if (!hits.length) return { block: null, sources: [] };
+  retrieve(query, { limit = DEFAULT_LIMIT, budgetChars = DEFAULT_BUDGET_CHARS, minScore = 1.0, mode = null } = {}) {
+    const spoken = isSpokenMode(mode);
+    const rawLimit = spoken ? Math.max(limit * 3, 12) : limit;
+    const ranked = this.search(query, { limit: rawLimit }).filter((h) => h.score >= minScore);
+    const weeds = spoken ? ranked.filter(isImplementationWeed) : [];
+    const hits = spoken ? ranked.filter((h) => !isImplementationWeed(h)).slice(0, limit) : ranked.slice(0, limit);
+    if (!hits.length && !weeds.length) return { block: null, sources: [] };
     const parts = [];
     const sources = [];
     let used = 0;
@@ -240,12 +265,27 @@ class KnowledgeBase {
       used += head.length + text.length + 2;
       if (truncated) break;
     }
-    const block = '=== Internal knowledge base (retrieved for this question) ===\n' +
-      'Numbered excerpts from Miter\'s internal docs (Slite) and the public Miter Guides. ' +
-      'Cite the number in square brackets after any sentence an excerpt supports, e.g. "… 10 weeks before launch [2]." ' +
-      'Prefer them over general knowledge; quote specifics (names, numbers, steps). ' +
-      'If they do not answer the question, say so rather than forcing a fit.\n\n' +
-      parts.join('\n\n---\n\n');
+    const background = weeds.slice(0, 4).map((h) => {
+      const title = h.doc.title || h.doc.file;
+      return `- ${title}: implementation/setup detail. We work with customers on this stack; how it is wired is a later conversation.`;
+    });
+    const citeBlurb = spoken
+      ? 'Numbered excerpts that may help this moment. Cite [n] only if you actually use one. ' +
+        'Setup and admin Guides are listed separately as background — do not say those out loud. ' +
+        'If the excerpts do not help move the call, ignore them.\n\n'
+      : 'Numbered excerpts from Miter\'s internal docs (Slite) and the public Miter Guides. ' +
+        'Cite the number in square brackets after any sentence an excerpt supports, e.g. "… 10 weeks before launch [2]." ' +
+        'Prefer them over general knowledge; quote specifics (names, numbers, steps). ' +
+        'If they do not answer the question, say so rather than forcing a fit.\n\n';
+    let block = '=== Internal knowledge base (retrieved for this question) ===\n' + citeBlurb;
+    if (parts.length) block += parts.join('\n\n---\n\n');
+    if (background.length) {
+      block += (parts.length ? '\n\n' : '') +
+        '=== Background from Miter Guides (for you, not to say) ===\n' +
+        'These pages are implementation/admin detail. Use them only so you do not invent a limitation. ' +
+        'Do not mention Miter Connect, connection methods, or setup steps unless they asked how implementation works.\n' +
+        background.join('\n');
+    }
     return { block, sources };
   }
 
@@ -260,6 +300,7 @@ module.exports = {
   tokenize,
   chunkMarkdown,
   parseFrontmatter,
+  isImplementationWeed,
   queryFromState: KnowledgeBase.queryFromState,
   init: (dir) => shared.init(dir),
   reload: () => shared.reload(),

@@ -570,7 +570,7 @@ async function runFeature(mode, userText) {
     if (settings.knowledgeBase !== false && knowledgeBase.isReady()) {
       const kbQuery = [knowledgeBase.queryFromState({ transcript, userText: userText || '' }), retrievalHints(category)].filter(Boolean).join('\n');
       const budget = settings.smart ? { limit: 10, budgetChars: 12000 } : { limit: 6, budgetChars: 7000 };
-      ({ block: kbBlock, sources: kbSources } = knowledgeBase.retrieve(kbQuery, budget));
+      ({ block: kbBlock, sources: kbSources } = knowledgeBase.retrieve(kbQuery, { ...budget, mode }));
     }
     send('llm:start', { userBubble, small: !!def.small, category, sources: kbSources });
 
