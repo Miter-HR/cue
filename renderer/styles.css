@@ -997,3 +997,43 @@ a.src-chip:hover { background: rgba(160,210,255,0.16); border-color: rgba(160,21
 .src-chip.src-slite { border-color: rgba(240,171,252,0.35); }
 .src-n { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; font-size: 10px; font-weight: 700; background: rgba(160,210,255,0.22); color: rgba(160,210,255,0.98); }
 .src-h { color: rgba(255,255,255,0.5); }
+/* ---- Simulating conversation (testing aid; press T during a session) ---- */
+.stt-simulating   { color: #f0abfc; }
+#sim-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; margin-bottom: -6px;
+  padding: 8px 10px;
+  background: rgba(240,171,252,0.08);
+  border: 1px solid rgba(240,171,252,0.35);
+  border-radius: var(--r-16);
+}
+#sim-bar.hidden { display: none; }
+.sim-who {
+  flex: none; min-width: 42px; text-align: center; border: none; cursor: pointer; font: inherit;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 999px;
+}
+.sim-who.them { background: rgba(160,210,255,0.18); color: rgba(160,210,255,0.95); }
+.sim-who.you  { background: rgba(180,255,200,0.16); color: rgba(180,255,200,0.95); }
+#sim-input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  color: rgba(255,255,255,0.92); font: inherit; font-size: 13px;
+}
+#sim-input::placeholder { color: rgba(255,255,255,0.35); }
+.sim-hint { flex: none; font-size: 10px; color: rgba(255,255,255,0.35); white-space: nowrap; }
+
+/* ---- Session menu (Start session / Simulate session) ---- */
+.tb-session-wrap { position: relative; display: inline-flex; align-items: center; -webkit-app-region: no-drag; }
+.tb-session-caret { width: 20px; height: 28px; border-radius: var(--r-8); color: rgba(255,255,255,0.55); display: inline-flex; align-items: center; justify-content: center; }
+.tb-session-caret:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.tb-session-caret .ic { width: 12px; height: 12px; display: inline-flex; }
+.session-popover { top: calc(100% + 8px); bottom: auto; left: 0; min-width: 240px; padding: 6px; gap: 2px; }
+.session-item {
+  display: grid; grid-template-columns: 16px 1fr; column-gap: 8px; align-items: center; text-align: left;
+  padding: 7px 8px; border-radius: 8px; color: rgba(255,255,255,0.92); font-size: 13px; font-weight: 500;
+}
+.session-item .ic { width: 14px; height: 14px; display: inline-flex; grid-row: 1 / span 2; }
+.session-item:hover { background: rgba(255,255,255,0.08); }
+.session-item[disabled] { opacity: 0.4; pointer-events: none; }
+.session-item-sub { grid-column: 2; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.5); }
+#toolbar .tb-stop.simulating { color: #f0abfc; }

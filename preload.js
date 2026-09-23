@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('cue', {
   windowDragStart: () => ipcRenderer.send('window:drag-start'),
   windowDragEnd: () => ipcRenderer.send('window:drag-end'),
   clearTranscript: () => ipcRenderer.invoke('transcript:clear'),
+  simulateTranscript: (channel, text) => ipcRenderer.invoke('transcript:simulate', { channel, text }),
   openPane: (url) => ipcRenderer.send('open-pane', url),
   publikState: () => ipcRenderer.invoke('publik:state'),
   publikAcceptDisclosure: () => ipcRenderer.invoke('publik:accept-disclosure'),

@@ -19,9 +19,16 @@
       <div class="tb-divider"></div>
       <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
       <div class="tb-divider"></div>
-      <button class="tb-stop" id="stop-btn" title="Start session" aria-label="Start session">
-        <span class="ic"></span><span class="tb-stop-label">Start session</span>
-      </button>
+      <div class="tb-session-wrap">
+        <button class="tb-stop" id="stop-btn" title="Start session" aria-label="Start session">
+          <span class="ic"></span><span class="tb-stop-label">Start session</span>
+        </button>
+        <button class="tb-session-caret" id="session-menu-btn" title="Session options" aria-label="Session options" aria-haspopup="menu" aria-expanded="false"><span class="ic"></span></button>
+        <div id="session-popover" class="opacity-popover session-popover hidden" role="menu">
+          <button class="session-item" id="session-start-item" role="menuitem"><span class="ic"></span><span>Start session</span><span class="session-item-sub">Listen to mic + meeting audio</span></button>
+          <button class="session-item" id="session-simulate-item" role="menuitem"><span class="ic"></span><span>Simulate session</span><span class="session-item-sub">Type lines as Them / You — no audio</span></button>
+        </div>
+      </div>
       <div class="tb-divider"></div>
       <div class="tb-opacity-wrap">
         <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
@@ -68,6 +75,11 @@
               <button class="act" data-mode="recap"><span class="ic"></span><span>Recap</span></button>
             </div>
 
+            <div id="sim-bar" class="hidden" role="group" aria-label="Simulate a line of conversation">
+              <button type="button" id="sim-who" class="sim-who them" title="Switch speaker (T / Y)">Them</button>
+              <input id="sim-input" type="text" spellcheck="false" autocomplete="off" placeholder="Type what they say · ↵ adds it" />
+              <span class="sim-hint">T them · Y you · Esc leave</span>
+            </div>
             <div id="composer">
               <div id="input-area">
                 <div id="placeholder">Ask a question that Cue has access to.</div>

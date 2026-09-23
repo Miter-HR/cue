@@ -25,16 +25,18 @@
   const clearIC = document.querySelector('#clear-transcript-btn .ic');
   if (clearIC) clearIC.innerHTML = icon('trash-2', { size: 15 });
 
-  function setSessionButton(active) {
+  function setSessionButton(active, kind) {
     const btn = $('#stop-btn');
     const ic = btn.querySelector('.ic');
     const label = btn.querySelector('.tb-stop-label');
+    const sim = active && kind === 'simulate';
     btn.classList.toggle('active', active);
+    btn.classList.toggle('simulating', sim);
     if (ic) ic.innerHTML = active
       ? icon('square', { size: 14 })
       : icon('play', { size: 14, filled: false });
-    if (label) label.textContent = active ? 'End session' : 'Start session';
-    const title = active ? 'End session' : 'Start session';
+    const title = active ? (sim ? 'End simulation' : 'End session') : 'Start session';
+    if (label) label.textContent = title;
     btn.title = title;
     btn.setAttribute('aria-label', title);
     const listening = !!active;
@@ -734,6 +736,7 @@
   // Stop = start/stop listening. Kick off system-audio capture straight from the click so
   // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
   $('#stop-btn').addEventListener('click', async () => {
+    if (simulating) { leaveSimulation(); return; }
     const turningOn = !$('#stop-btn').classList.contains('active');
     if (turningOn) {
       // startSystemAudio may fail (user cancels, no permission) — that's OK,
@@ -952,6 +955,8 @@
   }
 
   let sttState = 'disconnected';
+  let simulating = false;        // Simulating-conversation testing mode (see below)
+  let underlyingSttState = null;
 
   const STT_LABELS = {
     disconnected: 'Transcription off',
@@ -961,16 +966,122 @@
     batch: 'Transcription running',
     local: 'Transcription running',
     stopping: 'Stopping transcription…',
-    error: 'Transcription error'
+    error: 'Transcription error',
+    simulating: 'Simulating conversation'
   };
 
   function setSttState(state) {
+    // While simulating, real transcription updates keep flowing underneath but
+    // the label stays on "Simulating conversation" until the session ends.
+    if (simulating && state !== 'simulating' && state !== 'disconnected') { underlyingSttState = state; return; }
     sttState = state;
     const label = document.getElementById('stt-status');
     if (!label) return;
     label.textContent = STT_LABELS[state];
     label.className = 'stt-status stt-' + state;
   }
+
+  // ---- Simulating conversation (testing aid) --------------------------------
+  // Top bar ▾ → "Simulate session". No mic or meeting audio is started; instead a
+  // line editor opens with an active speaker (Them by default). T and Y switch
+  // the speaker — press them before typing (empty line) or click the speaker
+  // pill. What you type previews live in the transcript history under that
+  // speaker; Enter commits it through the same path a real transcription takes
+  // and the editor stays open for the next line. Esc or "End simulation" leaves.
+  let simChannel = 'them';
+  const simBar = $('#sim-bar');
+  const simInput = $('#sim-input');
+  const simWho = $('#sim-who');
+
+  function simSetSpeaker(channel) {
+    simChannel = channel === 'you' ? 'you' : 'them';
+    simWho.textContent = simChannel === 'you' ? 'You' : 'Them';
+    simWho.className = 'sim-who ' + simChannel;
+    simInput.placeholder = simChannel === 'you' ? 'Type what you say · ↵ adds it' : 'Type what they say · ↵ adds it';
+    simPreview();
+  }
+  // Live preview in the transcript history: the floating interim row carries
+  // the speaker in its label/class, so switching speaker rebuilds it.
+  function simPreview() {
+    if (!simulating) return;
+    const text = simInput.value;
+    if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+    appendTranscriptHistoryTurn(simChannel, text.trim() ? text : '…', true);
+  }
+  function enterSimulation() {
+    if (simulating || $('#stop-btn').classList.contains('active')) return;
+    simulating = true;
+    underlyingSttState = sttState;
+    setSttState('simulating');
+    setSessionButton(true, 'simulate');
+    composer.classList.add('listening');
+    simBar.classList.remove('hidden');
+    simSetSpeaker(simChannel);
+    simInput.focus();
+    showToast('Simulating session — T: them · Y: you · ↵: add · Esc: end', 2800);
+  }
+  function leaveSimulation() {
+    if (!simulating) return;
+    simulating = false;
+    simBar.classList.add('hidden');
+    simInput.value = '';
+    simInput.blur();
+    if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+    setSessionButton(false);
+    composer.classList.remove('listening');
+    const restore = underlyingSttState && underlyingSttState !== 'simulating' ? underlyingSttState : 'disconnected';
+    underlyingSttState = null;
+    setSttState(restore);
+  }
+  async function submitSimLine() {
+    const text = simInput.value.trim();
+    if (!text) return;
+    const res = await cue.simulateTranscript(simChannel, text);
+    if (!res || !res.ok) showToast('Could not add line' + (res && res.reason ? ': ' + res.reason : ''), 1800);
+    simInput.value = '';
+    simPreview();
+    simInput.focus();
+  }
+  simWho.addEventListener('click', () => { simSetSpeaker(simChannel === 'them' ? 'you' : 'them'); simInput.focus(); });
+  simInput.addEventListener('input', simPreview);
+  simInput.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    const plain = !(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey);
+    if (e.key === 'Enter') { e.preventDefault(); submitSimLine(); }
+    else if (e.key === 'Escape') { e.preventDefault(); leaveSimulation(); }
+    else if (plain && !simInput.value && (key === 't' || key === 'y')) { e.preventDefault(); simSetSpeaker(key === 'y' ? 'you' : 'them'); }
+    e.stopPropagation();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!simulating || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const key = e.key.toLowerCase();
+    if (key === 't' || key === 'y') { e.preventDefault(); simSetSpeaker(key === 'y' ? 'you' : 'them'); simInput.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); leaveSimulation(); }
+  });
+
+  // Session menu (▾ next to Start session)
+  const sessionWrap = document.querySelector('.tb-session-wrap');
+  const sessionPop = $('#session-popover');
+  const sessionMenuBtn = $('#session-menu-btn');
+  sessionMenuBtn.querySelector('.ic').innerHTML = icon('chevron-down', { size: 12 });
+  $('#session-start-item .ic').innerHTML = icon('play', { size: 14, filled: false });
+  $('#session-simulate-item .ic').innerHTML = icon('message-square-text', { size: 14 });
+  function toggleSessionMenu(force) {
+    const open = force != null ? !!force : sessionPop.classList.contains('hidden');
+    sessionPop.classList.toggle('hidden', !open);
+    sessionMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      const live = $('#stop-btn').classList.contains('active');
+      $('#session-start-item').toggleAttribute('disabled', live);
+      $('#session-simulate-item').toggleAttribute('disabled', live);
+    }
+  }
+  sessionMenuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSessionMenu(); });
+  document.addEventListener('click', (e) => { if (sessionWrap && !sessionWrap.contains(e.target)) toggleSessionMenu(false); });
+  $('#session-start-item').addEventListener('click', () => { toggleSessionMenu(false); $('#stop-btn').click(); });
+  $('#session-simulate-item').addEventListener('click', () => { toggleSessionMenu(false); enterSimulation(); });
 
   function updateSttStatus({ active, streaming } = {}) {
     if (active === false) setSttState('disconnected');
@@ -1138,6 +1249,7 @@
 
   // ---- events from main --------------------------------------------------
   cue.on('capture:state', ({ active, streaming, mode }) => {
+    if (!active) leaveSimulation();
     setLiveDotState(active ? 'idle' : 'off');
     setSessionButton(active);
     // FIX #4: Add .listening class to composer when capture is active
